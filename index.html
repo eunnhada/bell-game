@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1220">
+  <title>BELL 카드게임</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main id="app" class="app">
+    <section id="homeScreen" class="screen home-screen">
+      <div class="brand">
+        <div class="brand-bell" aria-hidden="true">🔔</div>
+        <h1>BELL</h1>
+        <p>벨을 눌러 승리를 쟁취하라!</p>
+      </div>
+
+      <div class="panel">
+        <label for="nickname">닉네임</label>
+        <input id="nickname" maxlength="10" placeholder="닉네임을 입력하세요" autocomplete="nickname">
+
+        <button id="createRoomButton" class="button primary" type="button">방 만들기</button>
+
+        <div class="divider"><span>또는</span></div>
+
+        <label for="roomCode">방 코드</label>
+        <input id="roomCode" maxlength="6" placeholder="방 코드 6자리" autocomplete="off">
+        <button id="joinRoomButton" class="button secondary" type="button">방 참가</button>
+
+        <button id="rulesButton" class="button ghost" type="button">
+          게임 규칙 보기
+        </button>
+
+        <p id="homeMessage" class="message" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <section id="lobbyScreen" class="screen lobby-screen hidden">
+      <header class="lobby-header">
+        <div>
+          <p class="eyebrow">대기실</p>
+          <h2>방 코드 <button id="copyRoomCodeButton" class="room-code" type="button">------</button></h2>
+        </div>
+        <button id="leaveRoomButton" class="button ghost small" type="button">나가기</button>
+      </header>
+
+      <div class="panel">
+        <div class="lobby-summary">
+          <span id="playerCount">0 / 6명</span>
+          <span id="connectionStatus">연결 중</span>
+        </div>
+
+        <ul id="playerList" class="player-list"></ul>
+
+        <div class="mode-grid">
+          <button class="mode-button active" data-mode="SOLO" type="button">개인전</button>
+          <button class="mode-button" data-mode="TEAM_2V2" type="button">2 VS 2</button>
+          <button class="mode-button" data-mode="TEAM_3V3" type="button">3 VS 3</button>
+        </div>
+
+        <button id="startGameButton" class="button primary hidden" type="button">게임 시작</button>
+        <p id="lobbyMessage" class="message" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <section id="gameScreen" class="screen game-screen hidden">
+      <div id="gameBoard" class="game-board">
+        <header class="game-topbar">
+          <div>
+            <span id="roundLabel">라운드 1 / 5</span>
+            <strong id="setLabel">세트 1</strong>
+            <span id="gameConnectionBadge" class="connection-badge">연결 중</span>
+          </div>
+
+          <div id="timer" class="timer">15</div>
+
+          <button id="gameLeaveButton" class="button ghost small" type="button">나가기</button>
+        </header>
+
+        <section id="opponentArea" class="opponent-area"></section>
+
+        <section class="field-area">
+          <div class="field-status">
+            <span id="turnLabel">현재 턴 확인 중</span>
+            <span id="phaseLabel">행동 대기</span>
+          </div>
+
+          <div class="table-zone">
+            <button id="openCardButton" class="pile-button" type="button" disabled>
+              <span class="pile-title">오픈 카드</span>
+              <span id="openCardSlot" class="card-slot"></span>
+            </button>
+
+            <button id="deckButton" class="pile-button" type="button" disabled>
+              <span class="pile-title">더미</span>
+              <span class="card card-back">BELL</span>
+              <span id="deckCount" class="pile-count">0장</span>
+            </button>
+
+            <button id="bellButton" class="bell-button" type="button" disabled>
+              <span>🔔</span>
+              <strong>벨</strong>
+            </button>
+          </div>
+
+          <p id="gameMessage" class="game-message" aria-live="polite"></p>
+        </section>
+
+        <aside id="gameLogPanel" class="game-log-panel">
+          <div class="hand-header">
+            <strong>게임 로그</strong>
+            <button id="toggleSoundButton" class="icon-button" type="button" aria-label="효과음 켜기 또는 끄기">
+              🔊
+            </button>
+          </div>
+          <ol id="gameLogList" class="game-log-list"></ol>
+        </aside>
+
+        <section class="hand-area">
+          <div class="hand-header">
+            <strong>내 카드</strong>
+            <span id="handCount">0 / 4</span>
+          </div>
+
+          <div id="handCards" class="hand-cards"></div>
+
+          <button id="confirmDiscardButton" class="button primary hidden" type="button">
+            선택한 카드 버리기
+          </button>
+
+          <div id="submitControls" class="submit-controls hidden">
+            <p id="selectedScorePreview" class="score-preview">
+              제출할 카드를 선택하세요.
+            </p>
+
+            <button id="submitCombinationButton" class="button primary" type="button">
+              조합 제출
+            </button>
+          </div>
+        </section>
+
+        <section id="resultPanel" class="result-panel hidden">
+          <div class="result-header">
+            <div>
+              <p class="eyebrow">세트 결과</p>
+              <h2 id="resultTitle">점수 공개</h2>
+            </div>
+
+            <span id="resultCountdown" class="result-countdown">5</span>
+          </div>
+
+          <div id="scoreBoard" class="score-board"></div>
+          <p id="lifeResultMessage" class="life-result-message"></p>
+        </section>
+
+        <section id="roundPanel" class="result-panel hidden">
+          <div class="result-header">
+            <div>
+              <p class="eyebrow">라운드 종료</p>
+              <h2 id="roundResultTitle">라운드 결과</h2>
+            </div>
+
+            <span id="roundCountdown" class="result-countdown">7</span>
+          </div>
+
+          <div id="roundScoreBoard" class="score-board"></div>
+          <p id="roundResultMessage" class="life-result-message"></p>
+        </section>
+
+        <section id="finalPanel" class="result-panel hidden">
+          <div class="result-header">
+            <div>
+              <p class="eyebrow">게임 종료</p>
+              <h2>최종 결과</h2>
+            </div>
+
+            <span class="result-countdown">🏆</span>
+          </div>
+
+          <div id="finalScoreBoard" class="score-board"></div>
+          <button id="returnHomeButton" class="button primary" type="button">
+            처음으로
+          </button>
+        </section>
+      </div>
+    </section>
+
+    <div id="rulesModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">BELL</p>
+            <h2 id="rulesTitle">게임 핵심 규칙</h2>
+          </div>
+          <button id="closeRulesButton" class="icon-button" type="button" aria-label="닫기">✕</button>
+        </div>
+
+        <div class="rules-content">
+          <section>
+            <h3>턴</h3>
+            <p>15초 안에 벨, 오픈 카드, 더미 중 하나를 선택합니다. 카드를 가져오면 5장 중 1장을 버립니다.</p>
+          </section>
+
+          <section>
+            <h3>조합</h3>
+            <p>같은 색 카드 2장 이상 또는 같은 숫자 카드 2장 이상을 제출합니다. 숫자의 합이 점수입니다.</p>
+          </section>
+
+          <section>
+            <h3>벨</h3>
+            <p>벨을 누르면 나머지 플레이어가 한 번씩 마지막 턴을 진행합니다. 벨을 누른 사람이 최고점이 아니면 라이프 2개를 잃습니다.</p>
+          </section>
+
+          <section>
+            <h3>라이프와 라운드</h3>
+            <p>모든 플레이어는 라운드마다 라이프 5개로 시작합니다. 한 명이 라이프 0이 되면 라운드가 끝납니다. 총 5라운드입니다.</p>
+          </section>
+
+          <section>
+            <h3>팀전 희생</h3>
+            <p>팀전 제출 단계에서 카드 1장만 내면 희생입니다. 본인이 라이프 1개를 잃고 최저점 팀원 1명을 보호합니다.</p>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module" src="./game.js"></script>
+</body>
+</html>
