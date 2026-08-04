@@ -1581,13 +1581,11 @@ function renderGame(room) {
     const teamText = player.team ? ` · ${player.team}팀` : "";
     handInfo.textContent = `카드 ${opponentHand.length}장${teamText}`;
 
-    const turnCountdown = document.createElement("div");
-    turnCountdown.className = "opponent-turn-countdown";
-    turnCountdown.dataset.turnUid = uid;
-    turnCountdown.textContent = "15";
-    turnCountdown.style.setProperty("--turn-progress", "1");
+    card.dataset.turnUid = uid;
+    card.style.setProperty("--turn-progress", "1");
+    card.style.setProperty("--turn-seconds", '"15"');
 
-    card.append(name, life, handInfo, turnCountdown);
+    card.append(name, life, handInfo);
     opponentArea.append(card);
   }
 
@@ -1778,21 +1776,29 @@ function startTimer(game) {
     timer.textContent = remaining;
     timer.classList.toggle("warning", remaining <= 5);
 
-    const opponentTurnTimer = document.querySelector(
-      `.opponent-turn-countdown[data-turn-uid="${game.turnUid}"]`
-    );
+    const isMyTurn =
+      game.turnUid === currentUser?.uid;
+
+    timer.classList.toggle("hidden", !isMyTurn);
 
     document.querySelectorAll(
-      ".opponent-turn-countdown"
+      ".opponent-card[data-turn-uid]"
     ).forEach((element) => {
       const active =
         element.dataset.turnUid === game.turnUid &&
-        game.turnUid !== currentUser?.uid;
+        !isMyTurn;
 
-      element.classList.toggle("visible", active);
+      element.classList.toggle(
+        "opponent-turn-active",
+        active
+      );
+
+      element.classList.toggle(
+        "opponent-turn-warning",
+        active && remaining <= 5
+      );
 
       if (active) {
-        element.textContent = remaining;
         element.style.setProperty(
           "--turn-progress",
           String(
@@ -1802,9 +1808,9 @@ function startTimer(game) {
           )
         );
 
-        element.classList.toggle(
-          "warning",
-          remaining <= 5
+        element.style.setProperty(
+          "--turn-seconds",
+          `"${remaining}"`
         );
       }
     });

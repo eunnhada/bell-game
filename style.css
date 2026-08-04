@@ -5830,3 +5830,181 @@ body.game-active #gameScreen {
     font-size: 18px !important;
   }
 }
+
+
+/* =========================================================
+   Stage 21 — 턴 타이머/중앙 필드 재배치
+   ========================================================= */
+
+/* 별도 네모 상대 타이머 제거 */
+.opponent-turn-countdown {
+  display: none !important;
+}
+
+/* 상대 프로필 테두리 자체가 타이머 */
+.opponent-card {
+  --turn-progress: 1;
+  --turn-seconds: "15";
+}
+
+.opponent-card.opponent-turn-active {
+  border-color: transparent !important;
+  background:
+    linear-gradient(
+      rgba(7, 17, 30, 0.96),
+      rgba(7, 17, 30, 0.96)
+    ) padding-box,
+    conic-gradient(
+      from -90deg,
+      var(--gold) calc(var(--turn-progress) * 1turn),
+      #34455b 0
+    ) border-box !important;
+  border: 3px solid transparent !important;
+  box-shadow:
+    0 0 0 1px rgba(7, 17, 30, 0.96),
+    0 0 20px rgba(248, 205, 94, 0.34) !important;
+}
+
+.opponent-card.opponent-turn-active::after {
+  content: var(--turn-seconds);
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 5px;
+  border-radius: 7px;
+  color: #07111e;
+  background: var(--gold);
+  font-size: 11px;
+  font-weight: 1000;
+  line-height: 1;
+  z-index: 10;
+}
+
+.opponent-card.opponent-turn-warning {
+  background:
+    linear-gradient(
+      rgba(7, 17, 30, 0.96),
+      rgba(7, 17, 30, 0.96)
+    ) padding-box,
+    conic-gradient(
+      from -90deg,
+      #ff6269 calc(var(--turn-progress) * 1turn),
+      #34455b 0
+    ) border-box !important;
+  box-shadow:
+    0 0 0 1px rgba(7, 17, 30, 0.96),
+    0 0 20px rgba(255, 98, 105, 0.4) !important;
+}
+
+.opponent-card.opponent-turn-warning::after {
+  color: white;
+  background: #d83c47;
+}
+
+/* 내 턴이 아닐 때 상단 원형 타이머 숨김 */
+.timer.hidden {
+  display: none !important;
+}
+
+/* 가로 중앙 필드: 타원 제거, 카드 3개 정렬 */
+@media (max-width: 960px) and (orientation: landscape) {
+  .field-area {
+    width: min(49vw, 470px) !important;
+    height: min(55%, 224px) !important;
+    min-width: 310px !important;
+    min-height: 150px !important;
+    max-width: 470px !important;
+    max-height: 224px !important;
+    padding: 6px !important;
+    border: 0 !important;
+    border-radius: 18px !important;
+    background:
+      linear-gradient(
+        180deg,
+        rgba(12, 36, 55, 0.88),
+        rgba(6, 19, 32, 0.9)
+      ) !important;
+    box-shadow:
+      inset 0 0 24px rgba(22, 131, 140, 0.11),
+      0 10px 30px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  .table-zone {
+    align-items: stretch !important;
+    gap: 5px !important;
+    padding: 0 !important;
+  }
+
+  .pile-button,
+  #bellButton.compact-pile-button {
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+    max-height: none !important;
+    border-radius: 11px !important;
+  }
+
+  .open-card-slot .card,
+  .deck-card,
+  #bellButton.compact-pile-button .compact-card {
+    width: min(13vh, 66px) !important;
+    height: min(19vh, 92px) !important;
+    min-width: 46px !important;
+    min-height: 66px !important;
+    max-width: 66px !important;
+    max-height: 92px !important;
+  }
+
+  /* 로그/채팅 바를 화면에 항상 보이게 */
+  .game-log-panel {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    grid-area: panel !important;
+    width: min(66vw, 560px) !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
+    align-self: center !important;
+    justify-self: center !important;
+    z-index: 80 !important;
+  }
+
+  .game-log-panel .side-panel-tabs {
+    display: grid !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  .side-tab,
+  .mobile-collapse-button,
+  #toggleSoundButton {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+}
+
+/* 세로 상대 타이머가 잘리지 않도록 카드 내부에 표시 */
+@media (max-width: 760px) and (orientation: portrait) {
+  .opponent-card {
+    overflow: visible !important;
+    padding-right: 32px !important;
+  }
+
+  .opponent-card.opponent-turn-active::after {
+    top: 4px !important;
+    right: 5px !important;
+    min-width: 22px !important;
+    height: 22px !important;
+    font-size: 10px !important;
+  }
+
+  .opponent-area {
+    padding-right: 6px !important;
+  }
+}
