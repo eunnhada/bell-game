@@ -1431,6 +1431,51 @@ export async function advanceAfterRound(roomCode) {
   return result.committed;
 }
 
+
+export async function returnFinishedGameToLobby(
+  roomCode,
+  uid
+) {
+  const roomRef = ref(db, `rooms/${roomCode}`);
+
+  const result = await runTransaction(roomRef, (room) => {
+    if (!room) return;
+    if (!room.players?.[uid]) return;
+
+    const gamePhase = room.game?.phase;
+    const finished =
+      room.meta?.status === "FINISHED" ||
+      gamePhase === "GAME_END";
+
+    if (!finished) return;
+
+    const hostUid = room.meta?.hostUid;
+
+    room.meta.status = "WAITING";
+    room.meta.round = 0;
+    room.meta.set = 0;
+    room.meta.updatedAt = Date.now();
+
+    for (const [playerUid, player] of Object.entries(
+      room.players ?? {}
+    )) {
+      player.life = 5;
+      player.ready = playerUid === hostUid;
+      player.roundWins = 0;
+      player.teamRoundWins = 0;
+      player.totalRemainingLife = 0;
+    }
+
+    room.game = null;
+
+    return room;
+  });
+
+  if (!result.committed) {
+    throw new Error("RETURN_TO_LOBBY_FAILED");
+  }
+}
+
 export async function resetFinishedRoom(roomCode, uid) {
   const roomRef = ref(db, `rooms/${roomCode}`);
   const snapshot = await get(roomRef);

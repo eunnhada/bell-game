@@ -1689,3 +1689,24 @@ body.reduced-motion *::after {
     min-width: 0;
   }
 }
+
+
+.final-action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin-top: 16px;
+}
+
+.final-result-note {
+  margin-top: 12px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 520px) {
+  .final-action-grid {
+    grid-template-columns: 1fr;
+  }
+}

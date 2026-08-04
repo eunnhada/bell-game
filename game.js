@@ -17,6 +17,7 @@ import {
   autoSubmitMissing,
   advanceAfterResult,
   advanceAfterRound,
+  returnFinishedGameToLobby,
   resetFinishedRoom,
   watchConnection,
   getRoom,
@@ -126,6 +127,7 @@ const roundResultMessage = document.querySelector("#roundResultMessage");
 const finalPanel = document.querySelector("#finalPanel");
 const finalScoreBoard = document.querySelector("#finalScoreBoard");
 const returnHomeButton = document.querySelector("#returnHomeButton");
+const returnLobbyButton = document.querySelector("#returnLobbyButton");
 
 let currentUser = null;
 let currentRoomCode = "";
@@ -623,6 +625,7 @@ function friendlyError(error) {
     return "인원을 확인해주세요. 2대2는 4명, 3대3은 6명이 필요합니다.";
   }
   if (message === "INVALID_ACTION") return "현재 실행할 수 없는 행동입니다.";
+  if (message === "RETURN_TO_LOBBY_FAILED") return "대기실로 돌아가지 못했습니다.";
 
   return message || "알 수 없는 오류가 발생했습니다.";
 }
@@ -715,7 +718,15 @@ async function enterLobby(roomCode) {
     currentRoom = room;
     renderLobby(room);
 
-    if (room.meta?.status === "PLAYING" && room.game) {
+    const shouldShowGame =
+      Boolean(room.game) &&
+      (
+        room.meta?.status === "PLAYING" ||
+        room.meta?.status === "FINISHED" ||
+        room.game?.phase === "GAME_END"
+      );
+
+    if (shouldShowGame) {
       handleGameEffects(room);
       renderGame(room);
       showScreen("game");
@@ -1177,6 +1188,7 @@ function renderRoundResult(room) {
 function renderFinalResult(room) {
   finalPanel.classList.remove("hidden");
   finalScoreBoard.innerHTML = "";
+  returnLobbyButton.disabled = false;
 
   const teamMode =
     room.meta?.mode === "TEAM_2V2" ||
@@ -2221,6 +2233,38 @@ bellButton.addEventListener("click", async () => {
   }
 });
 
+
+
+returnLobbyButton.addEventListener("click", async () => {
+  returnLobbyButton.disabled = true;
+
+  try {
+    await returnFinishedGameToLobby(
+      currentRoomCode,
+      currentUser.uid
+    );
+
+    selectedDiscardCardId = null;
+    selectedSubmitCardIds.clear();
+    previousGameSnapshot = null;
+    previousMyLife = null;
+    gameLogList.innerHTML = "";
+    setSideTab("log");
+
+    showMessage(
+      lobbyMessage,
+      "같은 방 대기실로 돌아왔습니다.",
+      "success"
+    );
+  } catch (error) {
+    showMessage(
+      gameMessage,
+      friendlyError(error)
+    );
+  } finally {
+    returnLobbyButton.disabled = false;
+  }
+});
 
 returnHomeButton.addEventListener("click", async () => {
   try {
