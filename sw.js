@@ -1,4 +1,4 @@
-const CACHE_NAME = "bell-game-v19-compact-ui";
+const CACHE_NAME = "bell-game-v20-table-ui";
 const APP_SHELL = [
   "./",
   "./index.html",

@@ -1581,7 +1581,13 @@ function renderGame(room) {
     const teamText = player.team ? ` · ${player.team}팀` : "";
     handInfo.textContent = `카드 ${opponentHand.length}장${teamText}`;
 
-    card.append(name, life, handInfo);
+    const turnCountdown = document.createElement("div");
+    turnCountdown.className = "opponent-turn-countdown";
+    turnCountdown.dataset.turnUid = uid;
+    turnCountdown.textContent = "15";
+    turnCountdown.style.setProperty("--turn-progress", "1");
+
+    card.append(name, life, handInfo, turnCountdown);
     opponentArea.append(card);
   }
 
@@ -1771,6 +1777,37 @@ function startTimer(game) {
 
     timer.textContent = remaining;
     timer.classList.toggle("warning", remaining <= 5);
+
+    const opponentTurnTimer = document.querySelector(
+      `.opponent-turn-countdown[data-turn-uid="${game.turnUid}"]`
+    );
+
+    document.querySelectorAll(
+      ".opponent-turn-countdown"
+    ).forEach((element) => {
+      const active =
+        element.dataset.turnUid === game.turnUid &&
+        game.turnUid !== currentUser?.uid;
+
+      element.classList.toggle("visible", active);
+
+      if (active) {
+        element.textContent = remaining;
+        element.style.setProperty(
+          "--turn-progress",
+          String(
+            duration > 0
+              ? Math.max(0, remaining / duration)
+              : 0
+          )
+        );
+
+        element.classList.toggle(
+          "warning",
+          remaining <= 5
+        );
+      }
+    });
 
     if (
       remaining <= 5 &&
