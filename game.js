@@ -97,6 +97,9 @@ const chatInput = document.querySelector("#chatInput");
 const sendChatButton = document.querySelector("#sendChatButton");
 const quickChatButtons = [...document.querySelectorAll(".quick-chat-button")];
 const toggleSoundButton = document.querySelector("#toggleSoundButton");
+const collapseSidePanelButton = document.querySelector("#collapseSidePanelButton");
+const cardPreviewModal = document.querySelector("#cardPreviewModal");
+const cardPreviewContent = document.querySelector("#cardPreviewContent");
 const opponentArea = document.querySelector("#opponentArea");
 const turnLabel = document.querySelector("#turnLabel");
 const phaseLabel = document.querySelector("#phaseLabel");
@@ -152,6 +155,8 @@ let activeSideTab = "log";
 let effectTimeout = null;
 let lastDangerSecond = null;
 let previousMyLife = null;
+let sidePanelExpanded = false;
+let cardPreviewTimer = null;
 let deferredInstallPrompt = null;
 let kickTargetUid = null;
 let wakeLock = null;
@@ -249,6 +254,76 @@ function updateOrientationNotice() {
 }
 
 
+
+function isMobileViewport() {
+  return window.matchMedia("(max-width: 760px)").matches;
+}
+
+function applySidePanelState() {
+  gameLogPanel.classList.toggle(
+    "mobile-expanded",
+    sidePanelExpanded
+  );
+
+  collapseSidePanelButton.textContent =
+    sidePanelExpanded ? "▲" : "▼";
+
+  collapseSidePanelButton.setAttribute(
+    "aria-label",
+    sidePanelExpanded
+      ? "로그와 채팅 접기"
+      : "로그와 채팅 펼치기"
+  );
+}
+
+function openCardPreview(card) {
+  if (!isMobileViewport() || !card) return;
+
+  cardPreviewContent.innerHTML = "";
+  cardPreviewContent.append(createCardElement(card));
+  cardPreviewModal.classList.remove("hidden");
+  cardPreviewModal.setAttribute("aria-hidden", "false");
+}
+
+function closeCardPreview() {
+  if (cardPreviewTimer) {
+    clearTimeout(cardPreviewTimer);
+    cardPreviewTimer = null;
+  }
+
+  cardPreviewModal.classList.add("hidden");
+  cardPreviewModal.setAttribute("aria-hidden", "true");
+  cardPreviewContent.innerHTML = "";
+}
+
+function bindCardLongPress(element, card) {
+  if (!element || !card) return;
+
+  const start = () => {
+    if (!isMobileViewport()) return;
+
+    cardPreviewTimer = setTimeout(() => {
+      openCardPreview(card);
+
+      if ("vibrate" in navigator) {
+        navigator.vibrate(40);
+      }
+    }, 450);
+  };
+
+  const cancel = () => {
+    if (cardPreviewTimer) {
+      clearTimeout(cardPreviewTimer);
+      cardPreviewTimer = null;
+    }
+  };
+
+  element.addEventListener("pointerdown", start);
+  element.addEventListener("pointerup", cancel);
+  element.addEventListener("pointercancel", cancel);
+  element.addEventListener("pointerleave", cancel);
+}
+
 function showGameEffect(text, type = "") {
   if (effectTimeout) {
     clearTimeout(effectTimeout);
@@ -279,6 +354,11 @@ function triggerBellImpact() {
 
 function setSideTab(tab) {
   activeSideTab = tab;
+
+  if (isMobileViewport()) {
+    sidePanelExpanded = true;
+    applySidePanelState();
+  }
 
   const chatActive = tab === "chat";
 
@@ -1522,6 +1602,7 @@ function renderGame(room) {
       button.classList.add("card-enter");
     }
 
+    bindCardLongPress(button, card);
     handCards.append(button);
   });
 
@@ -1794,6 +1875,24 @@ registerServiceWorker();
 
 
 
+
+
+collapseSidePanelButton.addEventListener("click", () => {
+  sidePanelExpanded = !sidePanelExpanded;
+  applySidePanelState();
+});
+
+cardPreviewModal.addEventListener("pointerup", closeCardPreview);
+cardPreviewModal.addEventListener("pointercancel", closeCardPreview);
+cardPreviewModal.addEventListener("click", closeCardPreview);
+
+window.addEventListener("resize", () => {
+  if (!isMobileViewport()) {
+    sidePanelExpanded = false;
+  }
+
+  applySidePanelState();
+});
 
 logTabButton.addEventListener("click", () => {
   setSideTab("log");
@@ -2427,5 +2526,11 @@ async function attemptReconnect() {
 
 applyAccessibilitySettings();
 setSideTab("log");
+
+if (isMobileViewport()) {
+  sidePanelExpanded = false;
+}
+
+applySidePanelState();
 updateOrientationNotice();
 attemptReconnect();

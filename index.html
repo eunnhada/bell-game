@@ -150,6 +150,9 @@
               채팅
               <span id="chatUnreadBadge" class="unread-badge hidden">0</span>
             </button>
+            <button id="collapseSidePanelButton" class="icon-button mobile-collapse-button" type="button" aria-label="로그와 채팅 접기">
+              ▼
+            </button>
             <button id="toggleSoundButton" class="icon-button" type="button" aria-label="효과음 켜기 또는 끄기">
               🔊
             </button>
@@ -273,6 +276,11 @@
         </section>
       </div>
     </section>
+
+    <div id="cardPreviewModal" class="card-preview-modal hidden" aria-hidden="true">
+      <div id="cardPreviewContent" class="card-preview-content"></div>
+      <p>손을 떼면 닫힙니다.</p>
+    </div>
 
     <div id="orientationNotice" class="orientation-notice hidden">
       <div>

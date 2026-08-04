@@ -1728,3 +1728,470 @@ body.reduced-motion *::after {
   color: #e2b8ff;
   font-size: 18px;
 }
+
+
+.mobile-collapse-button {
+  display: none;
+}
+
+.card-preview-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.74);
+  backdrop-filter: blur(7px);
+}
+
+.card-preview-content .card {
+  width: min(46vw, 230px);
+  height: min(66vw, 330px);
+  font-size: clamp(70px, 18vw, 120px);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.65);
+}
+
+.card-preview-modal p {
+  margin: 0;
+  color: white;
+  font-weight: 800;
+}
+
+@media (max-width: 760px) {
+  html,
+  body {
+    width: 100%;
+    min-height: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    min-height: 100dvh;
+  }
+
+  #gameScreen {
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+    padding:
+      max(6px, env(safe-area-inset-top))
+      8px
+      max(6px, env(safe-area-inset-bottom));
+  }
+
+  #gameScreen .game-shell,
+  #gameScreen .game-container {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .game-topbar {
+    min-height: 48px;
+    grid-template-columns: 1fr auto auto;
+    gap: 6px;
+    padding: 6px 8px;
+  }
+
+  .game-topbar h1,
+  .game-topbar .brand {
+    font-size: 18px;
+  }
+
+  #roundLabel,
+  #setLabel {
+    font-size: 12px;
+  }
+
+  .connection-badge {
+    margin-top: 2px;
+    padding: 2px 6px;
+    font-size: 8px;
+  }
+
+  .timer {
+    width: 48px;
+    height: 48px;
+    font-size: 24px;
+  }
+
+  .game-top-actions {
+    flex-direction: row;
+    gap: 4px;
+  }
+
+  .game-top-actions .icon-button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .game-top-actions .button {
+    min-height: 36px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .game-board {
+    height: calc(100dvh - 62px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows:
+      auto
+      minmax(190px, 30vh)
+      auto
+      minmax(178px, 1fr);
+    gap: 6px;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .opponent-area {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 1px 0 3px;
+    scrollbar-width: none;
+  }
+
+  .opponent-area::-webkit-scrollbar {
+    display: none;
+  }
+
+  .opponent-card {
+    min-width: 118px;
+    max-width: 140px;
+    min-height: 68px;
+    padding: 7px 9px;
+    border-radius: 12px;
+  }
+
+  .opponent-card .avatar {
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
+  }
+
+  .opponent-card .player-name {
+    font-size: 12px;
+  }
+
+  .opponent-card .player-meta,
+  .opponent-card .hand-info {
+    font-size: 9px;
+  }
+
+  .field-area {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 5px;
+    padding: 7px;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .turn-status,
+  .game-message {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.25;
+  }
+
+  .field-grid,
+  .pile-grid {
+    height: 100%;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+  }
+
+  .pile-card,
+  .field-card,
+  .bell-zone {
+    min-width: 0;
+    min-height: 0;
+    padding: 6px;
+    border-radius: 13px;
+  }
+
+  .pile-title,
+  .field-label {
+    margin-bottom: 4px;
+    font-size: 10px;
+  }
+
+  .open-card-slot .card,
+  .deck-card,
+  .bell-button {
+    width: min(23vw, 104px);
+    height: min(31vw, 142px);
+    min-height: 112px;
+    margin: auto;
+  }
+
+  .open-card-slot .card {
+    font-size: clamp(38px, 12vw, 62px);
+  }
+
+  .deck-card {
+    font-size: 14px;
+  }
+
+  .bell-button {
+    font-size: clamp(42px, 13vw, 66px);
+  }
+
+  .pile-count {
+    margin-top: 3px;
+    font-size: 9px;
+  }
+
+  .action-area,
+  .discard-area,
+  .submit-area {
+    gap: 5px;
+    margin: 0;
+  }
+
+  .action-area .button,
+  .discard-area .button,
+  .submit-area .button {
+    min-height: 38px;
+    padding: 0 9px;
+    font-size: 11px;
+  }
+
+  .game-log-panel {
+    position: relative;
+    z-index: 12;
+    min-height: 45px;
+    max-height: 45px;
+    padding: 5px 7px;
+    border-radius: 12px;
+    overflow: hidden;
+    transition:
+      max-height 0.25s ease,
+      min-height 0.25s ease;
+  }
+
+  .game-log-panel.mobile-expanded {
+    min-height: 180px;
+    max-height: min(36dvh, 270px);
+  }
+
+  .side-panel-tabs {
+    grid-template-columns: 1fr 1fr auto auto;
+    gap: 4px;
+    margin-bottom: 5px;
+  }
+
+  .side-tab {
+    min-height: 34px;
+    font-size: 10px;
+  }
+
+  .mobile-collapse-button {
+    display: grid;
+    width: 34px;
+    height: 34px;
+  }
+
+  .game-log-panel:not(.mobile-expanded) .side-tab-panel {
+    display: none !important;
+  }
+
+  .game-log-panel.mobile-expanded .side-tab-panel {
+    min-height: 0;
+  }
+
+  .game-log-list {
+    max-height: 125px;
+    font-size: 10px;
+  }
+
+  .chat-message-list {
+    height: 104px;
+  }
+
+  .chat-form input {
+    height: 36px;
+    min-height: 36px;
+    font-size: 12px;
+  }
+
+  .chat-form .small {
+    min-height: 36px;
+    height: 36px;
+  }
+
+  .quick-chat-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .hand-area {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    align-self: stretch;
+    padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
+    border-radius: 15px;
+    overflow: hidden;
+  }
+
+  .my-status-bar {
+    min-height: 42px;
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 4px;
+    padding: 5px 8px;
+    border-width: 1px;
+    border-radius: 11px;
+  }
+
+  .my-status-label {
+    margin: 0;
+    font-size: 8px;
+  }
+
+  .my-player-name {
+    font-size: 12px;
+  }
+
+  .my-life-display {
+    min-width: 0;
+    gap: 2px;
+    font-size: 20px;
+  }
+
+  .hand-header {
+    min-height: 28px;
+    margin-bottom: 3px;
+  }
+
+  .hand-header strong,
+  .hand-header span {
+    font-size: 12px;
+  }
+
+  .hand-cards {
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    align-items: end;
+    justify-content: center;
+    gap: clamp(3px, 1vw, 7px);
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 4px 1px 7px;
+    scrollbar-width: none;
+  }
+
+  .hand-cards::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hand-card {
+    flex: 0 0 clamp(58px, 18vw, 78px);
+    width: clamp(58px, 18vw, 78px);
+    height: clamp(84px, 25vw, 112px);
+    min-height: 84px;
+    border-radius: 11px;
+    font-size: clamp(28px, 9vw, 45px);
+  }
+
+  .hand-card.selected,
+  .hand-card.discard-selected {
+    transform: translateY(-8px);
+  }
+
+  .selection-info,
+  .combination-preview {
+    min-height: 24px;
+    margin: 2px 0 0;
+    font-size: 10px;
+    line-height: 1.2;
+  }
+
+  .result-panel {
+    position: absolute;
+    inset: 4px;
+    z-index: 80;
+    overflow-y: auto;
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .score-row {
+    padding: 8px;
+  }
+
+  .modal-card {
+    max-height: 88dvh;
+  }
+}
+
+@media (max-width: 760px) and (orientation: landscape) {
+  #gameScreen {
+    overflow: hidden;
+  }
+
+  .game-board {
+    grid-template-columns: 116px minmax(330px, 1fr) minmax(250px, 0.8fr);
+    grid-template-rows: 1fr;
+    height: calc(100dvh - 58px);
+    gap: 5px;
+  }
+
+  .opponent-area {
+    grid-column: 1;
+    grid-row: 1;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .opponent-card {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .field-area {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .hand-area {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .game-log-panel {
+    position: fixed;
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: min(42vw, 330px);
+  }
+
+  .open-card-slot .card,
+  .deck-card,
+  .bell-button {
+    width: min(17vh, 92px);
+    height: min(25vh, 130px);
+  }
+
+  .hand-cards {
+    flex-wrap: wrap;
+    align-content: end;
+  }
+
+  .hand-card {
+    flex-basis: clamp(50px, 11vw, 68px);
+    width: clamp(50px, 11vw, 68px);
+    height: clamp(72px, 16vw, 98px);
+  }
+}
