@@ -1710,3 +1710,21 @@ body.reduced-motion *::after {
     grid-template-columns: 1fr;
   }
 }
+
+
+.score-row.four-kind-row {
+  border-color: #d9a7ff;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(132, 65, 190, 0.3),
+      rgba(7, 14, 24, 0.8)
+    );
+  box-shadow:
+    0 0 24px rgba(194, 118, 255, 0.32);
+}
+
+.score-row.four-kind-row .score-number {
+  color: #e2b8ff;
+  font-size: 18px;
+}

@@ -973,7 +973,27 @@ function calculateSelectedScore(
       valid: true,
       score: Number(cards[0].number),
       sacrifice: false,
+      fourOfAKind: false,
       label: `한 장 조합 · ${cards[0].number}점`
+    };
+  }
+
+  const fourOfAKind =
+    cards.length === 4 &&
+    cards.every(
+      (card) => card.number === cards[0].number
+    );
+
+  if (fourOfAKind) {
+    return {
+      valid: true,
+      score: cards.reduce(
+        (total, card) => total + Number(card.number),
+        0
+      ),
+      sacrifice: false,
+      fourOfAKind: true,
+      label: `포카드 ${cards[0].number} · 모든 일반 조합보다 강함`
     };
   }
 
@@ -1063,9 +1083,23 @@ function renderResult(room) {
 
     const score = document.createElement("div");
     score.className = "score-number";
-    score.textContent = submission?.sacrifice
-      ? "희생"
-      : `${scores[uid] ?? 0}점`;
+    if (submission?.sacrifice) {
+      score.textContent = "희생";
+    } else if (
+      submission?.combinationType === "FOUR_OF_A_KIND"
+    ) {
+      const fourNumber =
+        submission.rankValue ??
+        hand.find(
+          (card) => selectedIds.includes(card.id)
+        )?.number ??
+        "";
+
+      score.textContent = `포카드 ${fourNumber}`;
+      row.classList.add("four-kind-row");
+    } else {
+      score.textContent = `${scores[uid] ?? 0}점`;
+    }
 
     row.append(name, cards, score);
     scoreBoard.append(row);

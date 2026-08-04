@@ -297,6 +297,46 @@ function isValidCombination(cards) {
   return sameColor || sameNumber;
 }
 
+
+function isFourOfAKind(cards) {
+  return (
+    Array.isArray(cards) &&
+    cards.length === 4 &&
+    cards.every(
+      (card) => card.number === cards[0].number
+    )
+  );
+}
+
+function combinationRank(cards) {
+  if (isFourOfAKind(cards)) {
+    return {
+      tier: 2,
+      score: Number(cards[0].number),
+      total: cards.reduce(
+        (sum, card) => sum + Number(card.number),
+        0
+      ),
+      type: "FOUR_OF_A_KIND"
+    };
+  }
+
+  return {
+    tier: 1,
+    score: combinationScore(cards),
+    total: combinationScore(cards),
+    type: "NORMAL"
+  };
+}
+
+function compareCombinationRanks(rankA, rankB) {
+  if (rankA.tier !== rankB.tier) {
+    return rankA.tier - rankB.tier;
+  }
+
+  return rankA.score - rankB.score;
+}
+
 function combinationScore(cards) {
   if (!isValidCombination(cards)) return 0;
 
@@ -309,7 +349,12 @@ function combinationScore(cards) {
 function bestCombination(hand) {
   const cards = Array.isArray(hand) ? hand : [];
   let bestCards = [];
-  let bestScore = 0;
+  let bestRank = {
+    tier: 0,
+    score: 0,
+    total: 0,
+    type: "NONE"
+  };
 
   const subsetCount = 1 << cards.length;
 
@@ -318,20 +363,32 @@ function bestCombination(hand) {
       (_, index) => (mask & (1 << index)) !== 0
     );
 
-    const score = combinationScore(selected);
+    if (!isValidCombination(selected)) continue;
+
+    const rank = combinationRank(selected);
+    const comparison = compareCombinationRanks(
+      rank,
+      bestRank
+    );
 
     if (
-      score > bestScore ||
-      (score === bestScore && selected.length > bestCards.length)
+      comparison > 0 ||
+      (
+        comparison === 0 &&
+        selected.length > bestCards.length
+      )
     ) {
       bestCards = selected;
-      bestScore = score;
+      bestRank = rank;
     }
   }
 
   return {
     cardIds: bestCards.map((card) => card.id),
-    score: bestScore,
+    score: bestRank.total,
+    rankTier: bestRank.tier,
+    rankValue: bestRank.score,
+    combinationType: bestRank.type,
     sacrifice: false
   };
 }
@@ -345,6 +402,9 @@ function selectedSubmission(hand, cardIds, teamMode) {
     return {
       cardIds: [selected[0].id],
       score: 0,
+      rankTier: 0,
+      rankValue: 0,
+      combinationType: "SACRIFICE",
       sacrifice: true
     };
   }
@@ -353,13 +413,21 @@ function selectedSubmission(hand, cardIds, teamMode) {
     return {
       cardIds: [],
       score: 0,
+      rankTier: 0,
+      rankValue: 0,
+      combinationType: "NONE",
       sacrifice: false
     };
   }
 
+  const rank = combinationRank(selected);
+
   return {
     cardIds: selected.map((card) => card.id),
-    score: combinationScore(selected),
+    score: rank.total,
+    rankTier: rank.tier,
+    rankValue: rank.score,
+    combinationType: rank.type,
     sacrifice: false
   };
 }
@@ -408,20 +476,59 @@ function evaluateSet(room) {
   const comparisonIds =
     normalPlayerIds.length > 0 ? normalPlayerIds : playerIds;
 
-  const comparisonScores = comparisonIds.map(
-    (uid) => scores[uid]
+  const playerRanks = Object.fromEntries(
+    comparisonIds.map((uid) => {
+      const submission = submissions[uid] ?? {};
+
+      return [
+        uid,
+        {
+          tier: Number(submission.rankTier ?? 1),
+          score: Number(
+            submission.rankValue ??
+            submission.score ??
+            0
+          )
+        }
+      ];
+    })
   );
 
-  const highestScore = Math.max(...comparisonScores);
-  const lowestScore = Math.min(...comparisonScores);
+  const sortedIds = [...comparisonIds].sort(
+    (uidA, uidB) => {
+      return compareCombinationRanks(
+        playerRanks[uidA],
+        playerRanks[uidB]
+      );
+    }
+  );
+
+  const lowestUid = sortedIds[0];
+  const highestUid = sortedIds.at(-1);
+
+  const lowestRank = playerRanks[lowestUid];
+  const highestRank = playerRanks[highestUid];
 
   const highestUids = comparisonIds.filter(
-    (uid) => scores[uid] === highestScore
+    (uid) => (
+      compareCombinationRanks(
+        playerRanks[uid],
+        highestRank
+      ) === 0
+    )
   );
 
   const initialLowestUids = comparisonIds.filter(
-    (uid) => scores[uid] === lowestScore
+    (uid) => (
+      compareCombinationRanks(
+        playerRanks[uid],
+        lowestRank
+      ) === 0
+    )
   );
+
+  const highestScore = scores[highestUid] ?? 0;
+  const lowestScore = scores[lowestUid] ?? 0;
 
   const protectedUids = [];
   const sacrificeDetails = {};
@@ -485,6 +592,7 @@ function evaluateSet(room) {
   game.resultStartedAt = Date.now();
   game.result = {
     scores,
+    playerRanks,
     highestScore,
     lowestScore,
     highestUids,
@@ -1247,6 +1355,9 @@ export async function submitCombination(
     room.game.submissions[uid] = {
       cardIds: evaluated.cardIds,
       score: evaluated.score,
+      rankTier: evaluated.rankTier ?? 1,
+      rankValue: evaluated.rankValue ?? evaluated.score,
+      combinationType: evaluated.combinationType ?? "NORMAL",
       sacrifice: evaluated.sacrifice,
       automatic,
       submittedAt: Date.now()
@@ -1286,6 +1397,9 @@ export async function autoSubmitMissing(roomCode) {
       submissions[uid] = {
         cardIds: evaluated.cardIds,
         score: evaluated.score,
+        rankTier: evaluated.rankTier ?? 1,
+        rankValue: evaluated.rankValue ?? evaluated.score,
+        combinationType: evaluated.combinationType ?? "NORMAL",
         sacrifice: false,
         automatic: true,
         submittedAt: Date.now()
