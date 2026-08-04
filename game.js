@@ -277,23 +277,28 @@ function scheduleViewportRefresh() {
   const refresh = () => {
     updateMobileViewportHeight();
 
+    const portrait =
+      window.matchMedia("(orientation: portrait)").matches;
+
     document.body.classList.toggle(
       "mobile-portrait",
-      window.matchMedia("(orientation: portrait)").matches
+      portrait
     );
 
     document.body.classList.toggle(
       "mobile-landscape",
-      window.matchMedia("(orientation: landscape)").matches
+      !portrait
     );
+
+    gameBoard.style.display = "none";
+    void gameBoard.offsetHeight;
+    gameBoard.style.display = "";
 
     opponentArea.scrollTop = 0;
     opponentArea.scrollLeft = 0;
     handCards.scrollTop = 0;
-
-    if (!sidePanelExpanded) {
-      gameLogPanel.scrollTop = 0;
-    }
+    handCards.scrollLeft = 0;
+    window.scrollTo(0, 0);
 
     applySidePanelState();
     updateOrientationNotice();
@@ -301,9 +306,10 @@ function scheduleViewportRefresh() {
 
   refresh();
 
-  viewportRefreshTimer = setTimeout(refresh, 120);
-  setTimeout(refresh, 320);
-  setTimeout(refresh, 620);
+  viewportRefreshTimer = setTimeout(refresh, 100);
+  setTimeout(refresh, 260);
+  setTimeout(refresh, 520);
+  setTimeout(refresh, 850);
 }
 
 function isMobileViewport() {

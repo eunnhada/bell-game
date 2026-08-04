@@ -134,13 +134,13 @@
               <span id="deckCount" class="pile-count">0장</span>
             </button>
 
-            <button id="bellButton" class="bell-button" type="button" disabled>
-              <span>🔔</span>
-              <strong>벨</strong>
+            <button id="bellButton" class="pile-button bell-button" type="button" disabled>
+              <span class="pile-title">벨</span>
+              <span class="bell-card-face">🔔</span>
+              <span class="pile-count">누르기</span>
             </button>
           </div>
 
-          <p id="gameMessage" class="game-message" aria-live="polite"></p>
         </section>
 
         <aside id="gameLogPanel" class="game-log-panel">
@@ -202,6 +202,8 @@
               <span class="life-heart">♥</span>
             </div>
           </div>
+
+          <p id="gameMessage" class="game-message hand-game-message" aria-live="polite"></p>
 
           <div class="hand-header">
             <strong>내 카드</strong>

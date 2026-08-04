@@ -3204,3 +3204,710 @@ body.reduced-motion *::after {
     max-height: min(70vh, 280px);
   }
 }
+
+
+/* =========================================================
+   Stage 16 — 모바일 전체화면 고정 레이아웃
+   이전 모바일 규칙을 마지막에서 확실히 덮어씀
+   ========================================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+.bell-card-face {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border: 3px solid rgba(255, 255, 255, 0.45);
+  border-radius: 13px;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(255, 224, 126, 0.24), transparent 42%),
+    linear-gradient(145deg, #17283d, #07111e);
+  font-size: clamp(42px, 8vw, 76px);
+  line-height: 1;
+  box-shadow:
+    inset 0 0 20px rgba(248, 205, 94, 0.09),
+    0 10px 24px rgba(0, 0, 0, 0.32);
+}
+
+.bell-button:not(:disabled):active .bell-card-face {
+  transform: scale(0.96);
+}
+
+.hand-game-message {
+  display: flex;
+  align-items: center;
+  min-height: 38px;
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid rgba(248, 205, 94, 0.28);
+  border-radius: 10px;
+  color: var(--gold);
+  background: rgba(248, 205, 94, 0.07);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.25;
+  overflow: hidden;
+}
+
+@media (max-width: 760px) {
+  :root {
+    --mobile-screen-height: var(--bell-app-height, 100dvh);
+  }
+
+  html,
+  body {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: var(--mobile-screen-height);
+    min-height: var(--mobile-screen-height);
+    max-height: var(--mobile-screen-height);
+    margin: 0;
+    overflow: hidden !important;
+    background: #07111e;
+  }
+
+  #gameScreen {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: var(--mobile-screen-height);
+    min-height: var(--mobile-screen-height);
+    max-height: var(--mobile-screen-height);
+    margin: 0;
+    padding:
+      env(safe-area-inset-top)
+      4px
+      env(safe-area-inset-bottom);
+    overflow: hidden !important;
+    background:
+      radial-gradient(circle at 50% 42%, rgba(12, 96, 86, 0.22), transparent 45%),
+      #07111e;
+  }
+
+  #gameScreen .game-shell,
+  #gameScreen .game-container {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  .game-board {
+    position: relative;
+    width: 100%;
+    height: calc(
+      var(--mobile-screen-height)
+      - env(safe-area-inset-top)
+      - env(safe-area-inset-bottom)
+    );
+    min-height: 0;
+    max-height: none;
+    margin: 0;
+    padding: 4px;
+    border: 3px solid var(--gold);
+    border-radius: 22px;
+    overflow: hidden;
+    box-shadow:
+      0 0 28px rgba(248, 205, 94, 0.28),
+      inset 0 0 20px rgba(248, 205, 94, 0.05);
+  }
+
+  .game-topbar {
+    grid-area: topbar;
+    position: static;
+    width: 100%;
+    min-width: 0;
+    height: 52px;
+    min-height: 52px;
+    max-height: 52px;
+    padding: 4px 7px;
+    border: 0;
+    border-radius: 14px;
+    background: rgba(11, 27, 47, 0.96);
+    overflow: hidden;
+  }
+
+  .opponent-area {
+    grid-area: opponents;
+  }
+
+  .field-area {
+    grid-area: field;
+  }
+
+  .game-log-panel {
+    grid-area: panel;
+  }
+
+  .hand-area {
+    grid-area: hand;
+  }
+
+  .field-status {
+    min-height: 26px;
+    overflow: hidden;
+  }
+
+  .table-zone {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .pile-button,
+  .bell-button {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .pile-button .card,
+  .bell-card-face {
+    transition: transform 0.15s ease;
+  }
+
+  .orientation-notice {
+    display: none !important;
+  }
+}
+
+/* 세로: 화면 전체를 위아래 빈 공간 없이 사용 */
+@media (max-width: 760px) and (orientation: portrait) {
+  .game-board {
+    display: grid;
+    grid-template-areas:
+      "topbar"
+      "opponents"
+      "field"
+      "panel"
+      "hand";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows:
+      52px
+      66px
+      250px
+      42px
+      minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .game-topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 48px auto;
+    gap: 4px;
+  }
+
+  #roundLabel {
+    font-size: 9px;
+  }
+
+  #setLabel {
+    font-size: 14px;
+  }
+
+  .timer {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 22px;
+  }
+
+  .game-top-actions {
+    gap: 3px;
+  }
+
+  .game-top-actions .icon-button,
+  .game-top-actions .button {
+    height: 36px;
+    min-height: 36px;
+    padding: 0 8px;
+    font-size: 10px;
+  }
+
+  .opponent-area {
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+    width: 100%;
+    height: 66px;
+    min-height: 66px;
+    max-height: 66px;
+    padding: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .opponent-card {
+    flex: 0 0 112px;
+    width: 112px;
+    min-width: 112px;
+    max-width: 112px;
+    height: 64px;
+    min-height: 64px;
+    max-height: 64px;
+    padding: 5px 7px;
+    border-radius: 11px;
+  }
+
+  .field-area {
+    display: grid;
+    grid-template-rows: 30px minmax(0, 1fr);
+    gap: 4px;
+    width: 100%;
+    height: 250px;
+    min-height: 250px;
+    max-height: 250px;
+    padding: 5px;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .field-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 30px;
+    max-height: 30px;
+    font-size: 11px;
+  }
+
+  .table-zone {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .pile-button,
+  .bell-button {
+    display: grid;
+    grid-template-rows: 20px minmax(0, 1fr) 16px;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    padding: 5px;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .pile-title {
+    font-size: 9px;
+  }
+
+  .pile-count {
+    font-size: 8px;
+  }
+
+  .open-card-slot,
+  .deck-card,
+  .bell-card-face {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .open-card-slot {
+    display: grid;
+    place-items: center;
+  }
+
+  .open-card-slot .card,
+  .deck-card,
+  .bell-card-face {
+    width: min(24vw, 104px);
+    height: min(34vw, 148px);
+    min-width: 72px;
+    min-height: 104px;
+    max-width: 104px;
+    max-height: 148px;
+    margin: auto;
+    border-radius: 12px;
+  }
+
+  .bell-card-face {
+    font-size: clamp(42px, 13vw, 65px);
+  }
+
+  .game-log-panel {
+    position: relative;
+    width: 100%;
+    height: 42px;
+    min-height: 42px;
+    max-height: 42px;
+    margin: 0;
+    padding: 4px;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .game-log-panel.mobile-expanded {
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    bottom: calc(
+      min(38vh, 330px)
+      + env(safe-area-inset-bottom)
+    );
+    z-index: 80;
+    width: auto;
+    height: min(34vh, 250px);
+    min-height: 170px;
+    max-height: 250px;
+  }
+
+  .hand-area {
+    display: grid;
+    grid-template-rows:
+      42px
+      minmax(38px, auto)
+      24px
+      minmax(0, 1fr)
+      22px;
+    gap: 3px;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    padding: 5px 6px 7px;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .my-status-bar {
+    height: 42px;
+    min-height: 42px;
+    max-height: 42px;
+    margin: 0;
+  }
+
+  .hand-game-message {
+    min-height: 38px;
+    max-height: 52px;
+    padding: 6px 8px;
+    font-size: 10px;
+    white-space: normal;
+  }
+
+  .hand-header {
+    height: 24px;
+    min-height: 24px;
+    max-height: 24px;
+    margin: 0;
+  }
+
+  .hand-cards {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    padding: 2px 0 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .hand-card {
+    flex: 0 0 clamp(54px, 17.4vw, 76px);
+    width: clamp(54px, 17.4vw, 76px);
+    height: clamp(78px, 25vw, 110px);
+    min-height: 78px;
+    max-height: 110px;
+    font-size: clamp(27px, 8.5vw, 43px);
+  }
+
+  .selection-info,
+  .combination-preview {
+    height: 22px;
+    min-height: 22px;
+    max-height: 22px;
+    line-height: 22px;
+  }
+}
+
+/* 낮은 세로 화면은 필드를 조금 줄여 손패 확보 */
+@media (max-width: 760px) and (orientation: portrait) and (max-height: 760px) {
+  .game-board {
+    grid-template-rows:
+      50px
+      60px
+      218px
+      40px
+      minmax(0, 1fr);
+  }
+
+  .game-topbar {
+    height: 50px;
+    min-height: 50px;
+    max-height: 50px;
+  }
+
+  .opponent-area {
+    height: 60px;
+    min-height: 60px;
+    max-height: 60px;
+  }
+
+  .opponent-card {
+    height: 58px;
+    min-height: 58px;
+    max-height: 58px;
+  }
+
+  .field-area {
+    height: 218px;
+    min-height: 218px;
+    max-height: 218px;
+  }
+
+  .open-card-slot .card,
+  .deck-card,
+  .bell-card-face {
+    width: min(22vw, 92px);
+    height: min(29vw, 124px);
+    min-height: 92px;
+  }
+
+  .hand-area {
+    grid-template-rows:
+      38px
+      minmax(34px, auto)
+      22px
+      minmax(0, 1fr)
+      20px;
+  }
+
+  .my-status-bar {
+    height: 38px;
+    min-height: 38px;
+    max-height: 38px;
+  }
+
+  .hand-card {
+    flex-basis: clamp(49px, 15.5vw, 66px);
+    width: clamp(49px, 15.5vw, 66px);
+    height: clamp(70px, 21vw, 92px);
+  }
+}
+
+/* 가로: 상단바 포함 한 화면 고정, 가로 스크롤 제거 */
+@media (max-width: 960px) and (orientation: landscape) {
+  html,
+  body,
+  #gameScreen {
+    width: 100vw;
+    max-width: 100vw;
+    overflow: hidden !important;
+  }
+
+  .game-board {
+    display: grid;
+    grid-template-areas:
+      "topbar topbar topbar"
+      "opponents field hand";
+    grid-template-columns:
+      clamp(96px, 14vw, 122px)
+      minmax(360px, 1fr)
+      clamp(230px, 30vw, 310px);
+    grid-template-rows:
+      50px
+      minmax(0, 1fr);
+    gap: 4px;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    padding: 4px;
+    overflow: hidden;
+  }
+
+  .game-topbar {
+    height: 50px;
+    min-height: 50px;
+    max-height: 50px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 46px auto;
+  }
+
+  .opponent-area {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .opponent-card {
+    flex: 0 0 60px;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: 60px;
+    min-height: 60px;
+    max-height: 60px;
+  }
+
+  .field-area {
+    display: grid;
+    grid-template-rows: 30px minmax(0, 1fr);
+    gap: 4px;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    min-height: 0;
+    padding: 5px;
+    overflow: hidden;
+  }
+
+  .field-status {
+    min-height: 30px;
+    max-height: 30px;
+  }
+
+  .table-zone {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+  }
+
+  .pile-button,
+  .bell-button {
+    display: grid;
+    grid-template-rows: 20px minmax(0, 1fr) 16px;
+    min-width: 0;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+    padding: 5px;
+  }
+
+  .open-card-slot .card,
+  .deck-card,
+  .bell-card-face {
+    width: min(17vh, 98px);
+    height: min(25vh, 136px);
+    min-width: 62px;
+    min-height: 86px;
+    max-width: 98px;
+    max-height: 136px;
+    margin: auto;
+  }
+
+  .hand-area {
+    display: grid;
+    grid-template-rows:
+      40px
+      minmax(34px, auto)
+      22px
+      minmax(0, 1fr)
+      20px;
+    gap: 3px;
+    min-width: 0;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+    padding: 5px;
+    overflow: hidden;
+  }
+
+  .my-status-bar {
+    height: 40px;
+    min-height: 40px;
+    max-height: 40px;
+    margin: 0;
+  }
+
+  .hand-game-message {
+    min-height: 34px;
+    max-height: 48px;
+    padding: 5px 7px;
+    font-size: 9px;
+  }
+
+  .hand-cards {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: center;
+    justify-content: center;
+    gap: 4px;
+    min-width: 0;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .hand-card {
+    flex: 0 0 clamp(48px, 7.5vw, 66px);
+    width: clamp(48px, 7.5vw, 66px);
+    height: clamp(68px, 10.5vw, 94px);
+    min-height: 68px;
+    max-height: 94px;
+  }
+
+  .game-log-panel {
+    position: fixed;
+    right: calc(
+      clamp(230px, 30vw, 310px)
+      + 10px
+      + env(safe-area-inset-right)
+    );
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    width: min(31vw, 280px);
+    height: 40px;
+    min-height: 40px;
+    max-height: 40px;
+    z-index: 70;
+  }
+
+  .game-log-panel.mobile-expanded {
+    left: auto;
+    right: calc(
+      clamp(230px, 30vw, 310px)
+      + 10px
+      + env(safe-area-inset-right)
+    );
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    width: min(31vw, 280px);
+    height: min(58vh, 250px);
+    min-height: 165px;
+    max-height: 250px;
+  }
+}
+
+/* 매우 좁은 가로 화면 */
+@media (max-width: 720px) and (orientation: landscape) {
+  .game-board {
+    grid-template-columns:
+      88px
+      minmax(280px, 1fr)
+      210px;
+  }
+
+  .game-log-panel,
+  .game-log-panel.mobile-expanded {
+    right: calc(216px + env(safe-area-inset-right));
+  }
+
+  .open-card-slot .card,
+  .deck-card,
+  .bell-card-face {
+    width: min(15vh, 82px);
+    height: min(22vh, 112px);
+  }
+}

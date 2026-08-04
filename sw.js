@@ -1,4 +1,4 @@
-const CACHE_NAME = "bell-game-v1";
+const CACHE_NAME = "bell-game-v16-fullscreen";
 const APP_SHELL = [
   "./",
   "./index.html",
