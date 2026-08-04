@@ -274,15 +274,36 @@ function scheduleViewportRefresh() {
     clearTimeout(viewportRefreshTimer);
   }
 
-  updateMobileViewportHeight();
-
-  viewportRefreshTimer = setTimeout(() => {
+  const refresh = () => {
     updateMobileViewportHeight();
+
+    document.body.classList.toggle(
+      "mobile-portrait",
+      window.matchMedia("(orientation: portrait)").matches
+    );
+
+    document.body.classList.toggle(
+      "mobile-landscape",
+      window.matchMedia("(orientation: landscape)").matches
+    );
+
+    opponentArea.scrollTop = 0;
+    opponentArea.scrollLeft = 0;
+    handCards.scrollTop = 0;
+
+    if (!sidePanelExpanded) {
+      gameLogPanel.scrollTop = 0;
+    }
+
     applySidePanelState();
     updateOrientationNotice();
-  }, 180);
+  };
 
-  setTimeout(updateMobileViewportHeight, 420);
+  refresh();
+
+  viewportRefreshTimer = setTimeout(refresh, 120);
+  setTimeout(refresh, 320);
+  setTimeout(refresh, 620);
 }
 
 function isMobileViewport() {
@@ -1927,7 +1948,12 @@ window.addEventListener("resize", () => {
 
 window.addEventListener(
   "orientationchange",
-  scheduleViewportRefresh
+  () => {
+    sidePanelExpanded = false;
+    applySidePanelState();
+    closeCardPreview();
+    scheduleViewportRefresh();
+  }
 );
 
 window.visualViewport?.addEventListener(
@@ -2053,6 +2079,7 @@ document.addEventListener("visibilitychange", () => {
     !screens.game.classList.contains("hidden")
   ) {
     requestWakeLock();
+    scheduleViewportRefresh();
   }
 });
 
