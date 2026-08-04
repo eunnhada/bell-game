@@ -1,4 +1,4 @@
-const CACHE_NAME = "bell-game-v21-turn-timer-layout";
+const CACHE_NAME = "bell-game-v22-input-layout-fix";
 const APP_SHELL = [
   "./",
   "./index.html",

@@ -34,6 +34,7 @@ const screens = {
 
 const nicknameInput = document.querySelector("#nickname");
 const roomCodeInput = document.querySelector("#roomCode");
+const versionBadge = document.querySelector("#versionBadge");
 const createRoomButton = document.querySelector("#createRoomButton");
 const joinRoomButton = document.querySelector("#joinRoomButton");
 const homeMessage = document.querySelector("#homeMessage");
@@ -689,6 +690,45 @@ function clearRoomCodeFromUrl() {
   const url = new URL(window.location.href);
   url.searchParams.delete("room");
   window.history.replaceState({}, "", url);
+}
+
+
+function focusInputIntoView(input, block = "center") {
+  document.body.classList.add("keyboard-open");
+
+  const move = () => {
+    input.scrollIntoView({
+      behavior: "smooth",
+      block,
+      inline: "nearest"
+    });
+  };
+
+  setTimeout(move, 80);
+  setTimeout(move, 320);
+}
+
+function releaseKeyboardLayout() {
+  setTimeout(() => {
+    const active = document.activeElement;
+    const stillEditing =
+      active instanceof HTMLInputElement ||
+      active instanceof HTMLTextAreaElement;
+
+    if (!stillEditing) {
+      document.body.classList.remove("keyboard-open");
+      window.scrollTo(0, 0);
+      scheduleViewportRefresh();
+    }
+  }, 180);
+}
+
+function bindMobileInputLayout(input, block = "center") {
+  input.addEventListener("focus", () => {
+    focusInputIntoView(input, block);
+  });
+
+  input.addEventListener("blur", releaseKeyboardLayout);
 }
 
 function showScreen(name) {
@@ -2051,6 +2091,18 @@ quickChatButtons.forEach((button) => {
   button.addEventListener("click", async () => {
     await submitChat(button.dataset.message);
   });
+});
+
+
+bindMobileInputLayout(nicknameInput, "start");
+bindMobileInputLayout(roomCodeInput, "start");
+bindMobileInputLayout(chatInput, "start");
+
+chatInput.addEventListener("focus", () => {
+  if (!sidePanelExpanded) {
+    sidePanelExpanded = true;
+    applySidePanelState();
+  }
 });
 
 settingsButton.addEventListener("click", () => {
