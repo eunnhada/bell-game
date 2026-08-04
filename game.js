@@ -1935,9 +1935,23 @@ registerServiceWorker();
 
 
 
-collapseSidePanelButton.addEventListener("click", () => {
+collapseSidePanelButton.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+
   sidePanelExpanded = !sidePanelExpanded;
   applySidePanelState();
+
+  if (sidePanelExpanded) {
+    requestAnimationFrame(() => {
+      const activePanel =
+        activeSideTab === "chat"
+          ? chatTabPanel
+          : logTabPanel;
+
+      activePanel.scrollTop = activePanel.scrollHeight;
+    });
+  }
 });
 
 cardPreviewModal.addEventListener("pointerup", closeCardPreview);
