@@ -41,9 +41,15 @@
           📱 홈 화면에 설치
         </button>
 
-        <button id="rulesButton" class="button ghost" type="button">
-          게임 규칙 보기
-        </button>
+        <div class="home-option-grid">
+          <button id="settingsButton" class="button ghost" type="button">
+            ⚙️ 게임 설정
+          </button>
+
+          <button id="rulesButton" class="button ghost" type="button">
+            게임 규칙 보기
+          </button>
+        </div>
 
         <p id="homeMessage" class="message" aria-live="polite"></p>
       </div>
@@ -96,7 +102,12 @@
 
           <div id="timer" class="timer">15</div>
 
-          <button id="gameLeaveButton" class="button ghost small" type="button">나가기</button>
+          <div class="game-top-actions">
+            <button id="fullscreenButton" class="icon-button" type="button" aria-label="전체화면">
+              ⛶
+            </button>
+            <button id="gameLeaveButton" class="button ghost small" type="button">나가기</button>
+          </div>
         </header>
 
         <section id="opponentArea" class="opponent-area"></section>
@@ -206,6 +217,60 @@
         </section>
       </div>
     </section>
+
+    <div id="orientationNotice" class="orientation-notice hidden">
+      <div>
+        <strong>가로 화면 권장</strong>
+        <p>휴대폰을 가로로 돌리면 게임판을 더 넓게 볼 수 있습니다.</p>
+      </div>
+      <button id="dismissOrientationButton" class="icon-button" type="button" aria-label="닫기">✕</button>
+    </div>
+
+    <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <div class="modal-card compact-modal">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">접근성</p>
+            <h2 id="settingsTitle">게임 설정</h2>
+          </div>
+          <button id="closeSettingsButton" class="icon-button" type="button" aria-label="닫기">✕</button>
+        </div>
+
+        <div class="settings-list">
+          <label class="setting-row">
+            <span>
+              <strong>색상 구분 기호</strong>
+              <small>카드에 R·Y·G·B 표시</small>
+            </span>
+            <input id="colorSymbolToggle" type="checkbox">
+          </label>
+
+          <label class="setting-row">
+            <span>
+              <strong>큰 글씨</strong>
+              <small>텍스트와 버튼 크기 확대</small>
+            </span>
+            <input id="largeTextToggle" type="checkbox">
+          </label>
+
+          <label class="setting-row">
+            <span>
+              <strong>애니메이션 줄이기</strong>
+              <small>반짝임과 흔들림 최소화</small>
+            </span>
+            <input id="reducedMotionToggle" type="checkbox">
+          </label>
+
+          <label class="setting-row">
+            <span>
+              <strong>화면 꺼짐 방지</strong>
+              <small>게임 중 화면이 자동으로 꺼지지 않게 함</small>
+            </span>
+            <input id="wakeLockToggle" type="checkbox">
+          </label>
+        </div>
+      </div>
+    </div>
 
     <div id="kickModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="kickTitle">
       <div class="modal-card compact-modal">

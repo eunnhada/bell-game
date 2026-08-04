@@ -36,6 +36,15 @@ const joinRoomButton = document.querySelector("#joinRoomButton");
 const homeMessage = document.querySelector("#homeMessage");
 const inviteNotice = document.querySelector("#inviteNotice");
 const rulesButton = document.querySelector("#rulesButton");
+const settingsButton = document.querySelector("#settingsButton");
+const settingsModal = document.querySelector("#settingsModal");
+const closeSettingsButton = document.querySelector("#closeSettingsButton");
+const colorSymbolToggle = document.querySelector("#colorSymbolToggle");
+const largeTextToggle = document.querySelector("#largeTextToggle");
+const reducedMotionToggle = document.querySelector("#reducedMotionToggle");
+const wakeLockToggle = document.querySelector("#wakeLockToggle");
+const orientationNotice = document.querySelector("#orientationNotice");
+const dismissOrientationButton = document.querySelector("#dismissOrientationButton");
 const installAppButton = document.querySelector("#installAppButton");
 const updateToast = document.querySelector("#updateToast");
 const reloadAppButton = document.querySelector("#reloadAppButton");
@@ -69,6 +78,7 @@ const roundLabel = document.querySelector("#roundLabel");
 const setLabel = document.querySelector("#setLabel");
 const timer = document.querySelector("#timer");
 const gameLeaveButton = document.querySelector("#gameLeaveButton");
+const fullscreenButton = document.querySelector("#fullscreenButton");
 const gameConnectionBadge = document.querySelector("#gameConnectionBadge");
 const gameLogList = document.querySelector("#gameLogList");
 const toggleSoundButton = document.querySelector("#toggleSoundButton");
@@ -117,7 +127,99 @@ let soundEnabled = localStorage.getItem("bellSoundEnabled") !== "false";
 let previousGameSnapshot = null;
 let deferredInstallPrompt = null;
 let kickTargetUid = null;
+let wakeLock = null;
 
+const accessibilitySettings = {
+  colorSymbols:
+    localStorage.getItem("bellColorSymbols") === "true",
+  largeText:
+    localStorage.getItem("bellLargeText") === "true",
+  reducedMotion:
+    localStorage.getItem("bellReducedMotion") === "true",
+  wakeLock:
+    localStorage.getItem("bellWakeLock") !== "false"
+};
+
+
+
+function applyAccessibilitySettings() {
+  document.body.classList.toggle(
+    "color-symbols",
+    accessibilitySettings.colorSymbols
+  );
+
+  document.body.classList.toggle(
+    "large-text",
+    accessibilitySettings.largeText
+  );
+
+  document.body.classList.toggle(
+    "reduced-motion",
+    accessibilitySettings.reducedMotion
+  );
+
+  colorSymbolToggle.checked =
+    accessibilitySettings.colorSymbols;
+
+  largeTextToggle.checked =
+    accessibilitySettings.largeText;
+
+  reducedMotionToggle.checked =
+    accessibilitySettings.reducedMotion;
+
+  wakeLockToggle.checked =
+    accessibilitySettings.wakeLock;
+}
+
+async function requestWakeLock() {
+  if (
+    !accessibilitySettings.wakeLock ||
+    !("wakeLock" in navigator) ||
+    document.visibilityState !== "visible"
+  ) {
+    return;
+  }
+
+  try {
+    wakeLock = await navigator.wakeLock.request("screen");
+  } catch (error) {
+    console.debug("화면 꺼짐 방지 사용 불가:", error);
+  }
+}
+
+async function releaseWakeLock() {
+  if (!wakeLock) return;
+
+  try {
+    await wakeLock.release();
+  } catch {
+    // 이미 해제된 경우 무시
+  }
+
+  wakeLock = null;
+}
+
+function updateOrientationNotice() {
+  const isSmallScreen =
+    Math.min(window.innerWidth, window.innerHeight) < 700;
+
+  const isPortrait =
+    window.matchMedia("(orientation: portrait)").matches;
+
+  const dismissed =
+    sessionStorage.getItem("bellOrientationDismissed") === "true";
+
+  const gameVisible =
+    !screens.game.classList.contains("hidden");
+
+  orientationNotice.classList.toggle(
+    "hidden",
+    !isSmallScreen ||
+      !isPortrait ||
+      dismissed ||
+      !gameVisible
+  );
+}
 
 function playTone(type) {
   if (!soundEnabled) return;
@@ -272,6 +374,14 @@ function showScreen(name) {
   Object.entries(screens).forEach(([key, element]) => {
     element.classList.toggle("hidden", key !== name);
   });
+
+  updateOrientationNotice();
+
+  if (name === "game") {
+    requestWakeLock();
+  } else {
+    releaseWakeLock();
+  }
 }
 
 function showMessage(element, text, type = "") {
@@ -1402,6 +1512,109 @@ async function registerServiceWorker() {
 registerServiceWorker();
 
 
+
+settingsButton.addEventListener("click", () => {
+  settingsModal.classList.remove("hidden");
+});
+
+closeSettingsButton.addEventListener("click", () => {
+  settingsModal.classList.add("hidden");
+});
+
+settingsModal.addEventListener("click", (event) => {
+  if (event.target === settingsModal) {
+    settingsModal.classList.add("hidden");
+  }
+});
+
+colorSymbolToggle.addEventListener("change", () => {
+  accessibilitySettings.colorSymbols =
+    colorSymbolToggle.checked;
+
+  localStorage.setItem(
+    "bellColorSymbols",
+    String(accessibilitySettings.colorSymbols)
+  );
+
+  applyAccessibilitySettings();
+});
+
+largeTextToggle.addEventListener("change", () => {
+  accessibilitySettings.largeText =
+    largeTextToggle.checked;
+
+  localStorage.setItem(
+    "bellLargeText",
+    String(accessibilitySettings.largeText)
+  );
+
+  applyAccessibilitySettings();
+});
+
+reducedMotionToggle.addEventListener("change", () => {
+  accessibilitySettings.reducedMotion =
+    reducedMotionToggle.checked;
+
+  localStorage.setItem(
+    "bellReducedMotion",
+    String(accessibilitySettings.reducedMotion)
+  );
+
+  applyAccessibilitySettings();
+});
+
+wakeLockToggle.addEventListener("change", async () => {
+  accessibilitySettings.wakeLock =
+    wakeLockToggle.checked;
+
+  localStorage.setItem(
+    "bellWakeLock",
+    String(accessibilitySettings.wakeLock)
+  );
+
+  if (accessibilitySettings.wakeLock) {
+    await requestWakeLock();
+  } else {
+    await releaseWakeLock();
+  }
+});
+
+fullscreenButton.addEventListener("click", async () => {
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen();
+    } else {
+      await document.exitFullscreen();
+    }
+  } catch (error) {
+    showMessage(
+      gameMessage,
+      "이 브라우저에서는 전체화면을 사용할 수 없습니다."
+    );
+  }
+});
+
+dismissOrientationButton.addEventListener("click", () => {
+  sessionStorage.setItem(
+    "bellOrientationDismissed",
+    "true"
+  );
+
+  orientationNotice.classList.add("hidden");
+});
+
+window.addEventListener("resize", updateOrientationNotice);
+window.addEventListener("orientationchange", updateOrientationNotice);
+
+document.addEventListener("visibilitychange", () => {
+  if (
+    document.visibilityState === "visible" &&
+    !screens.game.classList.contains("hidden")
+  ) {
+    requestWakeLock();
+  }
+});
+
 shareRoomButton.addEventListener("click", () => {
   if (!currentRoomCode) return;
 
@@ -1822,4 +2035,6 @@ async function attemptReconnect() {
   }
 }
 
+applyAccessibilitySettings();
+updateOrientationNotice();
 attemptReconnect();
