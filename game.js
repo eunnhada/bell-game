@@ -107,6 +107,8 @@ const bellButton = document.querySelector("#bellButton");
 const gameMessage = document.querySelector("#gameMessage");
 const handCount = document.querySelector("#handCount");
 const handCards = document.querySelector("#handCards");
+const myPlayerName = document.querySelector("#myPlayerName");
+const myLifeDisplay = document.querySelector("#myLifeDisplay");
 const confirmDiscardButton = document.querySelector("#confirmDiscardButton");
 const submitControls = document.querySelector("#submitControls");
 const selectedScorePreview = document.querySelector("#selectedScorePreview");
@@ -147,6 +149,7 @@ let unreadChatCount = 0;
 let activeSideTab = "log";
 let effectTimeout = null;
 let lastDangerSecond = null;
+let previousMyLife = null;
 let deferredInstallPrompt = null;
 let kickTargetUid = null;
 let wakeLock = null;
@@ -932,7 +935,18 @@ function calculateSelectedScore(
   selectedIds,
   teamMode = false
 ) {
-  const cards = hand.filter((card) => selectedIds.has(card.id));
+  const cards = hand.filter(
+    (card) => selectedIds.has(card.id)
+  );
+
+  if (cards.length < 1) {
+    return {
+      valid: false,
+      score: 0,
+      sacrifice: false,
+      label: "카드를 1장 이상 선택하세요."
+    };
+  }
 
   if (teamMode && cards.length === 1) {
     return {
@@ -943,12 +957,12 @@ function calculateSelectedScore(
     };
   }
 
-  if (cards.length < 2) {
+  if (cards.length === 1) {
     return {
-      valid: false,
-      score: 0,
+      valid: true,
+      score: Number(cards[0].number),
       sacrifice: false,
-      label: "카드를 2장 이상 선택하세요."
+      label: `한 장 조합 · ${cards[0].number}점`
     };
   }
 
@@ -965,7 +979,7 @@ function calculateSelectedScore(
       valid: false,
       score: 0,
       sacrifice: false,
-      label: "같은 색 또는 같은 숫자만 제출할 수 있습니다."
+      label: "2장 이상은 같은 색 또는 같은 숫자만 가능합니다."
     };
   }
 
@@ -1248,9 +1262,63 @@ function renderFinalResult(room) {
   });
 }
 
+
+function renderMyLife(room) {
+  const myPlayer =
+    room.players?.[currentUser?.uid];
+
+  const life = Math.max(
+    0,
+    Number(myPlayer?.life ?? 0)
+  );
+
+  myPlayerName.textContent =
+    myPlayer?.nickname ?? "플레이어";
+
+  myLifeDisplay.innerHTML = "";
+
+  if (life <= 0) {
+    const empty = document.createElement("span");
+    empty.textContent = "라이프 0 · 탈락";
+    myLifeDisplay.append(empty);
+    myLifeDisplay.classList.add("no-life");
+  } else {
+    myLifeDisplay.classList.remove("no-life");
+
+    for (let index = 0; index < life; index += 1) {
+      const heart = document.createElement("span");
+      heart.className = "life-heart";
+      heart.textContent = "♥";
+      myLifeDisplay.append(heart);
+    }
+  }
+
+  myLifeDisplay.setAttribute(
+    "aria-label",
+    `내 라이프 ${life}개`
+  );
+
+  if (
+    previousMyLife !== null &&
+    life < previousMyLife
+  ) {
+    myLifeDisplay.classList.remove("life-lost");
+    void myLifeDisplay.offsetWidth;
+    myLifeDisplay.classList.add("life-lost");
+
+    setTimeout(() => {
+      myLifeDisplay.classList.remove("life-lost");
+    }, 700);
+  }
+
+  previousMyLife = life;
+}
+
 function renderGame(room) {
   const game = room.game;
   const myUid = currentUser?.uid;
+
+  renderMyLife(room);
   const isMyTurn = game.turnUid === myUid;
   const myHand = Array.isArray(game.hands?.[myUid]) ? game.hands[myUid] : [];
   const isDiscardPhase = isMyTurn && game.phase === "DISCARD";
@@ -2188,6 +2256,7 @@ returnHomeButton.addEventListener("click", async () => {
   unreadChatCount = 0;
   updateUnreadBadge();
   previousGameSnapshot = null;
+  previousMyLife = null;
   gameLogList.innerHTML = "";
   currentRoom = null;
   currentRoomCode = "";
@@ -2228,6 +2297,7 @@ async function handleLeave() {
   unreadChatCount = 0;
   updateUnreadBadge();
   previousGameSnapshot = null;
+  previousMyLife = null;
   gameLogList.innerHTML = "";
   currentRoom = null;
   currentRoomCode = "";

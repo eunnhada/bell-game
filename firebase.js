@@ -280,7 +280,11 @@ function assignTeams(room, orderedPlayerIds) {
 }
 
 function isValidCombination(cards) {
-  if (!Array.isArray(cards) || cards.length < 2) return false;
+  if (!Array.isArray(cards) || cards.length < 1) return false;
+
+  if (cards.length === 1) {
+    return true;
+  }
 
   const sameColor = cards.every(
     (card) => card.color === cards[0].color
