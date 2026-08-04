@@ -4260,3 +4260,397 @@ body.reduced-motion *::after {
     max-height: 330px !important;
   }
 }
+
+
+/* =========================================================
+   Stage 18 — layout reset
+   벨/PC/모바일 가로/로그·채팅 충돌 최종 차단
+   ========================================================= */
+
+/* 벨은 일반 카드와 같은 요소. 기존 .bell-button span 규칙의 영향을 받지 않음 */
+#bellButton.bell-pile {
+  min-height: 210px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #536780;
+  border-radius: 22px;
+  color: white;
+  background: rgba(7, 14, 24, 0.8);
+  overflow: hidden;
+}
+
+#bellButton.bell-pile .pile-title,
+#bellButton.bell-pile .pile-count {
+  width: 100%;
+  font-size: 13px;
+  line-height: 1.1;
+  text-align: center;
+  white-space: nowrap;
+  writing-mode: horizontal-tb;
+  transform: none;
+}
+
+#bellButton.bell-pile .pile-count {
+  font-size: 12px;
+}
+
+#bellButton.bell-pile .bell-card {
+  width: 76px;
+  aspect-ratio: 2 / 3;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: white;
+  background:
+    radial-gradient(circle at 50% 36%, rgba(255, 220, 110, 0.25), transparent 43%),
+    linear-gradient(145deg, #18283d, #07111e);
+  font-size: 44px;
+  line-height: 1;
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  transform: none;
+  filter: none;
+}
+
+#bellButton.bell-pile:not(:disabled):hover {
+  border-color: var(--gold);
+  box-shadow: 0 0 22px rgba(248, 205, 94, 0.28);
+}
+
+#bellButton.bell-pile:not(:disabled):active .bell-card {
+  transform: scale(0.96);
+}
+
+/* 게임 중 바깥 앱 레이아웃까지 화면에 고정 */
+body.game-active {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: var(--bell-app-height, 100dvh);
+  min-height: 0;
+  overflow: hidden !important;
+}
+
+body.game-active .app {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: var(--bell-app-height, 100dvh);
+  min-height: 0;
+  padding: 0;
+  display: block;
+  overflow: hidden !important;
+}
+
+body.game-active #gameScreen {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+/* PC: 벨·오픈 카드·더미를 동일 너비/높이 */
+@media (min-width: 961px) {
+  .table-zone {
+    grid-template-columns: repeat(3, minmax(150px, 170px));
+  }
+
+  .table-zone > .pile-button,
+  #bellButton.bell-pile {
+    width: 100%;
+    min-height: 210px;
+    height: 210px;
+  }
+
+  #bellButton.bell-pile .bell-card,
+  .table-zone .card {
+    width: 76px;
+  }
+}
+
+@media (max-width: 960px) {
+  body.game-active,
+  body.game-active .app,
+  body.game-active #gameScreen {
+    width: 100vw;
+    height: var(--bell-app-height, 100dvh);
+    max-height: var(--bell-app-height, 100dvh);
+    overflow: hidden !important;
+  }
+
+  body.game-active #gameScreen {
+    position: fixed;
+    inset: 0;
+    padding:
+      max(3px, env(safe-area-inset-top))
+      max(3px, env(safe-area-inset-right))
+      max(3px, env(safe-area-inset-bottom))
+      max(3px, env(safe-area-inset-left));
+  }
+
+  body.game-active #gameBoard {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    margin: 0;
+    overflow: hidden !important;
+  }
+
+  /* 모바일 벨도 두 카드와 정확히 같은 박스 */
+  #bellButton.bell-pile {
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 5px !important;
+    gap: 4px !important;
+    grid-template-rows: 20px minmax(0, 1fr) 16px !important;
+    border-radius: 14px !important;
+  }
+
+  #bellButton.bell-pile .bell-card,
+  .table-zone .open-card-slot .card,
+  .table-zone .card-back {
+    width: min(23vw, 98px) !important;
+    height: min(31vw, 136px) !important;
+    min-width: 68px !important;
+    min-height: 98px !important;
+    max-width: 98px !important;
+    max-height: 136px !important;
+    aspect-ratio: auto !important;
+    margin: auto !important;
+  }
+
+  #bellButton.bell-pile .bell-card {
+    font-size: clamp(38px, 11vw, 58px) !important;
+  }
+
+  /* 로그·채팅 펼치기: 중앙 모달, 본문은 내부 스크롤 */
+  .game-log-panel.mobile-expanded {
+    position: fixed !important;
+    z-index: 500 !important;
+    left: 50% !important;
+    top: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: translate(-50%, -50%) !important;
+    width: min(calc(100vw - 24px), 620px) !important;
+    height: min(calc(var(--bell-app-height, 100dvh) - 32px), 520px) !important;
+    min-height: 260px !important;
+    max-height: none !important;
+    padding: 9px !important;
+    border: 2px solid var(--gold) !important;
+    border-radius: 18px !important;
+    background: #07111e !important;
+    box-shadow: 0 30px 100px rgba(0, 0, 0, 0.86) !important;
+    overflow: hidden !important;
+  }
+
+  .game-log-panel.mobile-expanded .side-panel-tabs {
+    height: 40px;
+    min-height: 40px;
+    margin-bottom: 7px;
+  }
+
+  .game-log-panel.mobile-expanded .side-tab-panel:not(.hidden) {
+    display: flex !important;
+    flex-direction: column !important;
+    height: calc(100% - 47px) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .game-log-panel.mobile-expanded #logTabPanel {
+    overflow-y: auto !important;
+  }
+
+  .game-log-panel.mobile-expanded .game-log-list {
+    height: auto !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+  }
+
+  .game-log-panel.mobile-expanded .chat-message-list {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow-y: auto !important;
+  }
+
+  .game-log-panel.mobile-expanded .chat-form,
+  .game-log-panel.mobile-expanded .quick-chat-grid {
+    flex: 0 0 auto !important;
+  }
+
+  /* 버리기/제출 버튼은 손패 하단에서 항상 확보 */
+  .hand-area {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+  }
+
+  .hand-cards {
+    flex: 1 1 auto !important;
+    min-height: 68px !important;
+  }
+
+  #confirmDiscardButton,
+  #submitControls {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+  }
+
+  #confirmDiscardButton {
+    min-height: 38px !important;
+    height: 38px !important;
+    margin-top: 3px !important;
+  }
+}
+
+/* 세로 */
+@media (max-width: 760px) and (orientation: portrait) {
+  body.game-active #gameBoard {
+    display: grid !important;
+    grid-template-areas:
+      "topbar"
+      "opponents"
+      "field"
+      "panel"
+      "hand" !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows:
+      52px
+      66px
+      236px
+      42px
+      minmax(0, 1fr) !important;
+    gap: 4px !important;
+    padding: 4px !important;
+  }
+}
+
+/* 가로: 상단 포함 전체 화면, 자체 스크롤 금지 */
+@media (max-width: 960px) and (orientation: landscape) {
+  body.game-active #gameBoard {
+    display: grid !important;
+    grid-template-areas:
+      "topbar topbar topbar"
+      "opponents field hand"
+      "opponents panel hand" !important;
+    grid-template-columns:
+      13%
+      53%
+      34% !important;
+    grid-template-rows:
+      46px
+      minmax(0, 1fr)
+      38px !important;
+    gap: 3px !important;
+    padding: 3px !important;
+    overflow: hidden !important;
+  }
+
+  .game-topbar {
+    grid-area: topbar !important;
+    height: 46px !important;
+    min-height: 46px !important;
+    max-height: 46px !important;
+  }
+
+  .opponent-area {
+    grid-area: opponents !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
+  .field-area {
+    grid-area: field !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .game-log-panel {
+    grid-area: panel !important;
+    position: relative !important;
+    inset: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    max-height: 38px !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .game-log-panel.mobile-expanded {
+    position: fixed !important;
+    left: 50% !important;
+    top: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: translate(-50%, -50%) !important;
+    width: min(76vw, 680px) !important;
+    height: min(82vh, 420px) !important;
+    min-height: 230px !important;
+    max-height: none !important;
+  }
+
+  .hand-area {
+    grid-area: hand !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .table-zone {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .table-zone > .pile-button,
+  #bellButton.bell-pile {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  #bellButton.bell-pile .bell-card,
+  .table-zone .open-card-slot .card,
+  .table-zone .card-back {
+    width: min(15vh, 80px) !important;
+    height: min(22vh, 110px) !important;
+    min-width: 52px !important;
+    min-height: 74px !important;
+    max-width: 80px !important;
+    max-height: 110px !important;
+  }
+
+  .hand-game-message {
+    max-height: 36px !important;
+    font-size: 8px !important;
+  }
+
+  .hand-card {
+    flex: 0 0 clamp(40px, 6.8vw, 56px) !important;
+    width: clamp(40px, 6.8vw, 56px) !important;
+    height: clamp(58px, 9.5vw, 80px) !important;
+  }
+
+  #confirmDiscardButton {
+    min-height: 32px !important;
+    height: 32px !important;
+    font-size: 9px !important;
+  }
+}

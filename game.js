@@ -696,6 +696,11 @@ function showScreen(name) {
     element.classList.toggle("hidden", key !== name);
   });
 
+  document.body.classList.toggle(
+    "game-active",
+    name === "game"
+  );
+
   updateOrientationNotice();
 
   if (name === "game") {
@@ -1950,6 +1955,11 @@ collapseSidePanelButton.addEventListener("click", (event) => {
           : logTabPanel;
 
       activePanel.scrollTop = activePanel.scrollHeight;
+
+      if (activeSideTab === "chat") {
+        chatMessageList.scrollTop =
+          chatMessageList.scrollHeight;
+      }
     });
   }
 });
