@@ -255,6 +255,36 @@ function updateOrientationNotice() {
 
 
 
+
+let viewportRefreshTimer = null;
+
+function updateMobileViewportHeight() {
+  const viewportHeight =
+    window.visualViewport?.height ??
+    window.innerHeight;
+
+  document.documentElement.style.setProperty(
+    "--bell-app-height",
+    `${Math.round(viewportHeight)}px`
+  );
+}
+
+function scheduleViewportRefresh() {
+  if (viewportRefreshTimer) {
+    clearTimeout(viewportRefreshTimer);
+  }
+
+  updateMobileViewportHeight();
+
+  viewportRefreshTimer = setTimeout(() => {
+    updateMobileViewportHeight();
+    applySidePanelState();
+    updateOrientationNotice();
+  }, 180);
+
+  setTimeout(updateMobileViewportHeight, 420);
+}
+
 function isMobileViewport() {
   return window.matchMedia("(max-width: 760px)").matches;
 }
@@ -643,6 +673,7 @@ function showScreen(name) {
 
   if (name === "game") {
     requestWakeLock();
+    scheduleViewportRefresh();
   } else {
     releaseWakeLock();
   }
@@ -1891,8 +1922,18 @@ window.addEventListener("resize", () => {
     sidePanelExpanded = false;
   }
 
-  applySidePanelState();
+  scheduleViewportRefresh();
 });
+
+window.addEventListener(
+  "orientationchange",
+  scheduleViewportRefresh
+);
+
+window.visualViewport?.addEventListener(
+  "resize",
+  scheduleViewportRefresh
+);
 
 logTabButton.addEventListener("click", () => {
   setSideTab("log");
@@ -2524,6 +2565,7 @@ async function attemptReconnect() {
   }
 }
 
+updateMobileViewportHeight();
 applyAccessibilitySettings();
 setSideTab("log");
 
