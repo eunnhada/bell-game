@@ -6225,3 +6225,239 @@ body.game-active #gameScreen {
     min-height: 25px !important;
   }
 }
+
+
+/* =========================================================
+   Stage 23 — 가로 카드 통일 / 손패·라이프 복구
+   ========================================================= */
+
+/* 버전은 메인 화면에서만 표시 */
+.version-badge,
+#versionBadge,
+.app-version {
+  display: none !important;
+}
+
+#homeScreen .version-badge,
+#homeScreen #versionBadge,
+#homeScreen .app-version {
+  display: inline-flex !important;
+}
+
+/* 내 상태: 닉네임 왼쪽, 하트 오른쪽 고정 */
+.my-status-bar {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-rows: auto !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.my-status-bar > div:first-child {
+  min-width: 0 !important;
+}
+
+.my-life-display {
+  grid-column: 2 !important;
+  justify-self: end !important;
+  align-self: center !important;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  justify-content: flex-end !important;
+  width: auto !important;
+  min-width: max-content !important;
+  margin: 0 !important;
+  white-space: nowrap !important;
+}
+
+/* 가로 화면만 강제 통일 */
+@media (max-width: 960px) and (orientation: landscape) {
+  /* 중앙 필드 전체를 조금 더 작게 */
+  .field-area {
+    width: min(44vw, 430px) !important;
+    height: min(49%, 194px) !important;
+    min-width: 292px !important;
+    min-height: 138px !important;
+    max-width: 430px !important;
+    max-height: 194px !important;
+    padding: 5px !important;
+    border-radius: 14px !important;
+  }
+
+  .field-status {
+    height: 20px !important;
+    min-height: 20px !important;
+    max-height: 20px !important;
+    font-size: 7px !important;
+  }
+
+  /* 3칸을 동일한 크기로 */
+  .table-zone {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    align-items: stretch !important;
+    justify-items: stretch !important;
+    gap: 5px !important;
+    width: 100% !important;
+    height: 100% !important;
+    padding: 0 !important;
+  }
+
+  .table-zone > button,
+  .table-zone > .pile-button,
+  #bellButton,
+  #bellButton.compact-pile-button {
+    display: grid !important;
+    grid-template-rows: 17px minmax(0, 1fr) 13px !important;
+    place-items: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-width: none !important;
+    max-height: none !important;
+    padding: 4px !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
+  }
+
+  /* 오픈카드 슬롯 자체도 동일 중앙정렬 */
+  .open-card-slot {
+    display: grid !important;
+    place-items: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* 오픈/더미/벨 실제 카드 크기 완전 동일 */
+  .open-card-slot .card,
+  .deck-card,
+  .card-back,
+  #bellButton .compact-card,
+  #bellButton.compact-pile-button .compact-card,
+  #bellButton .bell-card {
+    width: 56px !important;
+    height: 78px !important;
+    min-width: 56px !important;
+    min-height: 78px !important;
+    max-width: 56px !important;
+    max-height: 78px !important;
+    aspect-ratio: auto !important;
+    margin: auto !important;
+    padding: 0 !important;
+    border-radius: 9px !important;
+    box-sizing: border-box !important;
+  }
+
+  #bellButton .compact-card,
+  #bellButton.compact-pile-button .compact-card,
+  #bellButton .bell-card {
+    font-size: 29px !important;
+  }
+
+  .open-card-slot .card {
+    font-size: 27px !important;
+  }
+
+  .deck-card,
+  .card-back {
+    font-size: 10px !important;
+  }
+
+  .pile-title,
+  #bellButton .compact-pile-label,
+  #bellButton .pile-title {
+    height: 17px !important;
+    line-height: 17px !important;
+    margin: 0 !important;
+    font-size: 7px !important;
+  }
+
+  .pile-count,
+  #bellButton .compact-pile-meta,
+  #bellButton .pile-count {
+    height: 13px !important;
+    line-height: 13px !important;
+    margin: 0 !important;
+    font-size: 6px !important;
+  }
+
+  /* 내 패 영역: 카드 바닥이 잘리지 않도록 높이와 패딩 확보 */
+  .hand-area {
+    height: 118px !important;
+    min-height: 118px !important;
+    max-height: 118px !important;
+    grid-template-rows: 32px 82px !important;
+    padding: 4px 7px 10px !important;
+    overflow: hidden !important;
+  }
+
+  .my-status-bar {
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: 4px 7px !important;
+  }
+
+  .my-life-display {
+    font-size: 12px !important;
+    gap: 1px !important;
+  }
+
+  .hand-cards {
+    height: 82px !important;
+    min-height: 82px !important;
+    max-height: 82px !important;
+    align-items: center !important;
+    padding: 2px 0 8px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+  }
+
+  .hand-card {
+    flex: 0 0 43px !important;
+    width: 43px !important;
+    height: 62px !important;
+    min-width: 43px !important;
+    min-height: 62px !important;
+    max-width: 43px !important;
+    max-height: 62px !important;
+    margin-bottom: 0 !important;
+    transform-origin: center bottom !important;
+    font-size: 20px !important;
+  }
+
+  .hand-card.selected,
+  .hand-card.discard-selected {
+    transform: translateY(-4px) !important;
+  }
+
+  /* 우측 액션 버튼도 패 영역 밖으로 넘지 않게 */
+  #confirmDiscardButton,
+  #submitControls {
+    width: 88px !important;
+    min-width: 88px !important;
+    max-width: 88px !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+  }
+}
+
+/* 세로에서도 라이프 위치 복구 */
+@media (max-width: 760px) and (orientation: portrait) {
+  .my-status-bar {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: center !important;
+  }
+
+  .my-life-display {
+    grid-column: 2 !important;
+    justify-self: end !important;
+    margin: 0 !important;
+  }
+}
