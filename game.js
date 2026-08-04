@@ -623,78 +623,6 @@ function renderLobby(room) {
     });
 
   
-readyButton.addEventListener("click", async () => {
-  const currentReady =
-    currentRoom?.players?.[currentUser?.uid]?.ready === true;
-
-  try {
-    await setPlayerReady(
-      currentRoomCode,
-      currentUser.uid,
-      !currentReady
-    );
-  } catch (error) {
-    showMessage(lobbyMessage, friendlyError(error), "error");
-  }
-});
-
-shuffleTeamsButton.addEventListener("click", async () => {
-  try {
-    await shuffleTeams(
-      currentRoomCode,
-      currentUser.uid
-    );
-
-    showMessage(
-      lobbyMessage,
-      "팀을 다시 섞었습니다. 전원이 다시 준비해야 합니다.",
-      "success"
-    );
-  } catch (error) {
-    showMessage(lobbyMessage, friendlyError(error), "error");
-  }
-});
-
-closeKickButton.addEventListener("click", () => {
-  kickTargetUid = null;
-  kickModal.classList.add("hidden");
-});
-
-cancelKickButton.addEventListener("click", () => {
-  kickTargetUid = null;
-  kickModal.classList.add("hidden");
-});
-
-kickModal.addEventListener("click", (event) => {
-  if (event.target === kickModal) {
-    kickTargetUid = null;
-    kickModal.classList.add("hidden");
-  }
-});
-
-confirmKickButton.addEventListener("click", async () => {
-  if (!kickTargetUid) return;
-
-  try {
-    await kickPlayer(
-      currentRoomCode,
-      currentUser.uid,
-      kickTargetUid
-    );
-
-    kickTargetUid = null;
-    kickModal.classList.add("hidden");
-
-    showMessage(
-      lobbyMessage,
-      "플레이어를 방에서 내보냈습니다.",
-      "success"
-    );
-  } catch (error) {
-    showMessage(lobbyMessage, friendlyError(error), "error");
-  }
-});
-
 modeButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.mode === room.meta?.mode);
     button.disabled = !isHost;
@@ -1779,8 +1707,23 @@ copyRoomCodeButton.addEventListener("click", async () => {
 
 
 readyButton.addEventListener("click", async () => {
+  if (
+    !currentUser ||
+    !currentRoomCode ||
+    !currentRoom?.players?.[currentUser.uid]
+  ) {
+    showMessage(
+      lobbyMessage,
+      "플레이어 연결을 다시 확인해주세요.",
+      "error"
+    );
+    return;
+  }
+
   const currentReady =
-    currentRoom?.players?.[currentUser?.uid]?.ready === true;
+    currentRoom.players[currentUser.uid].ready === true;
+
+  readyButton.disabled = true;
 
   try {
     await setPlayerReady(
@@ -1789,11 +1732,21 @@ readyButton.addEventListener("click", async () => {
       !currentReady
     );
   } catch (error) {
-    showMessage(lobbyMessage, friendlyError(error), "error");
+    console.error("준비 상태 변경 실패:", error);
+
+    showMessage(
+      lobbyMessage,
+      friendlyError(error),
+      "error"
+    );
+  } finally {
+    readyButton.disabled = false;
   }
 });
 
 shuffleTeamsButton.addEventListener("click", async () => {
+  shuffleTeamsButton.disabled = true;
+
   try {
     await shuffleTeams(
       currentRoomCode,
@@ -1806,7 +1759,13 @@ shuffleTeamsButton.addEventListener("click", async () => {
       "success"
     );
   } catch (error) {
-    showMessage(lobbyMessage, friendlyError(error), "error");
+    showMessage(
+      lobbyMessage,
+      friendlyError(error),
+      "error"
+    );
+  } finally {
+    shuffleTeamsButton.disabled = false;
   }
 });
 
@@ -1830,6 +1789,8 @@ kickModal.addEventListener("click", (event) => {
 confirmKickButton.addEventListener("click", async () => {
   if (!kickTargetUid) return;
 
+  confirmKickButton.disabled = true;
+
   try {
     await kickPlayer(
       currentRoomCode,
@@ -1846,7 +1807,13 @@ confirmKickButton.addEventListener("click", async () => {
       "success"
     );
   } catch (error) {
-    showMessage(lobbyMessage, friendlyError(error), "error");
+    showMessage(
+      lobbyMessage,
+      friendlyError(error),
+      "error"
+    );
+  } finally {
+    confirmKickButton.disabled = false;
   }
 });
 
