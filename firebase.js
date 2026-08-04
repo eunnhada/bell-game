@@ -68,7 +68,8 @@ export async function createRoom({ roomCode, user, nickname }) {
         round: 0,
         set: 0,
         maxPlayers: 6,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        updatedAt: Date.now()
       },
       players: {
         [user.uid]: {
@@ -1237,22 +1238,44 @@ export async function resetFinishedRoom(roomCode, uid) {
 
 export async function leaveRoom(roomCode, uid) {
   const roomRef = ref(db, `rooms/${roomCode}`);
-  const roomSnapshot = await get(roomRef);
 
-  if (!roomSnapshot.exists()) return;
+  await runTransaction(roomRef, (room) => {
+    if (!room) return null;
 
-  const room = roomSnapshot.val();
-  const players = room.players ?? {};
-  const playerIds = Object.keys(players);
+    const players = room.players ?? {};
 
-  if (room.meta?.hostUid === uid) {
-    await remove(roomRef);
-    return;
-  }
+    if (!players[uid]) return room;
 
-  await remove(ref(db, `rooms/${roomCode}/players/${uid}`));
+    delete players[uid];
 
-  if (playerIds.length <= 1) {
-    await remove(roomRef);
-  }
+    const remainingIds = Object.keys(players);
+
+    if (remainingIds.length === 0) {
+      return null;
+    }
+
+    room.players = players;
+    room.meta.updatedAt = Date.now();
+
+    if (room.meta?.hostUid === uid) {
+      const nextHostUid = remainingIds
+        .sort((uidA, uidB) => {
+          return Number(players[uidA]?.joinedAt ?? 0) -
+            Number(players[uidB]?.joinedAt ?? 0);
+        })[0];
+
+      room.meta.hostUid = nextHostUid;
+      room.meta.hostChangedAt = Date.now();
+
+      room.game = room.game ?? {};
+      room.game.lastAction = {
+        type: "HOST_CHANGED",
+        uid: nextHostUid,
+        automatic: true,
+        at: Date.now()
+      };
+    }
+
+    return room;
+  });
 }

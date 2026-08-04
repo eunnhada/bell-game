@@ -22,6 +22,10 @@
       </div>
 
       <div class="panel">
+        <div id="inviteNotice" class="invite-notice hidden">
+          초대받은 방 코드가 자동으로 입력됐습니다.
+        </div>
+
         <label for="nickname">닉네임</label>
         <input id="nickname" maxlength="10" placeholder="닉네임을 입력하세요" autocomplete="nickname">
 
@@ -51,7 +55,10 @@
           <p class="eyebrow">대기실</p>
           <h2>방 코드 <button id="copyRoomCodeButton" class="room-code" type="button">------</button></h2>
         </div>
-        <button id="leaveRoomButton" class="button ghost small" type="button">나가기</button>
+        <div class="lobby-actions">
+          <button id="shareRoomButton" class="button ghost small" type="button">초대 링크</button>
+          <button id="leaveRoomButton" class="button ghost small" type="button">나가기</button>
+        </div>
       </header>
 
       <div class="panel">
@@ -194,6 +201,32 @@
         </section>
       </div>
     </section>
+
+    <div id="shareModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+      <div class="modal-card compact-modal">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">친구 초대</p>
+            <h2 id="shareTitle">방 링크 공유</h2>
+          </div>
+          <button id="closeShareButton" class="icon-button" type="button" aria-label="닫기">✕</button>
+        </div>
+
+        <label for="shareLinkInput">초대 링크</label>
+        <div class="share-link-row">
+          <input id="shareLinkInput" type="text" readonly>
+          <button id="copyShareLinkButton" class="button primary small" type="button">복사</button>
+        </div>
+
+        <button id="nativeShareButton" class="button secondary" type="button">
+          휴대폰 공유창 열기
+        </button>
+
+        <p class="player-meta">
+          링크를 열면 방 코드가 자동으로 입력됩니다.
+        </p>
+      </div>
+    </div>
 
     <div id="rulesModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
       <div class="modal-card">

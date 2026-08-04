@@ -31,6 +31,7 @@ const roomCodeInput = document.querySelector("#roomCode");
 const createRoomButton = document.querySelector("#createRoomButton");
 const joinRoomButton = document.querySelector("#joinRoomButton");
 const homeMessage = document.querySelector("#homeMessage");
+const inviteNotice = document.querySelector("#inviteNotice");
 const rulesButton = document.querySelector("#rulesButton");
 const installAppButton = document.querySelector("#installAppButton");
 const updateToast = document.querySelector("#updateToast");
@@ -40,6 +41,12 @@ const closeRulesButton = document.querySelector("#closeRulesButton");
 
 const copyRoomCodeButton = document.querySelector("#copyRoomCodeButton");
 const leaveRoomButton = document.querySelector("#leaveRoomButton");
+const shareRoomButton = document.querySelector("#shareRoomButton");
+const shareModal = document.querySelector("#shareModal");
+const closeShareButton = document.querySelector("#closeShareButton");
+const shareLinkInput = document.querySelector("#shareLinkInput");
+const copyShareLinkButton = document.querySelector("#copyShareLinkButton");
+const nativeShareButton = document.querySelector("#nativeShareButton");
 const playerCount = document.querySelector("#playerCount");
 const connectionStatus = document.querySelector("#connectionStatus");
 const playerList = document.querySelector("#playerList");
@@ -171,7 +178,8 @@ function actionToLog(room) {
     BELL: `${name}님이 벨을 눌렀습니다!`,
     AUTO_BELL_DECK_EMPTY: "더미가 소진되어 자동 벨이 울렸습니다.",
     NEXT_SET: "다음 세트가 시작됐습니다.",
-    NEXT_ROUND: "다음 라운드가 시작됐습니다."
+    NEXT_ROUND: "다음 라운드가 시작됐습니다.",
+    HOST_CHANGED: `${name}님이 새 방장이 됐습니다.`
   };
 
   return messages[action.type] ?? "";
@@ -227,6 +235,26 @@ function handleGameEffects(room) {
   }
 
   previousGameSnapshot = structuredClone(currentGame);
+}
+
+
+function buildInviteLink(roomCode) {
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.hash = "";
+  url.searchParams.set("room", roomCode);
+  return url.toString();
+}
+
+function readRoomCodeFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return normalizeRoomCode(params.get("room") ?? "");
+}
+
+function clearRoomCodeFromUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("room");
+  window.history.replaceState({}, "", url);
 }
 
 function showScreen(name) {
@@ -301,6 +329,7 @@ async function login() {
 async function enterLobby(roomCode) {
   currentRoomCode = roomCode;
   copyRoomCodeButton.textContent = roomCode;
+  clearRoomCodeFromUrl();
 
   localStorage.setItem("bellRoomCode", roomCode);
   localStorage.setItem("bellNickname", getNickname());
@@ -1188,6 +1217,63 @@ async function registerServiceWorker() {
 
 registerServiceWorker();
 
+
+shareRoomButton.addEventListener("click", () => {
+  if (!currentRoomCode) return;
+
+  shareLinkInput.value = buildInviteLink(currentRoomCode);
+  shareModal.classList.remove("hidden");
+});
+
+closeShareButton.addEventListener("click", () => {
+  shareModal.classList.add("hidden");
+});
+
+shareModal.addEventListener("click", (event) => {
+  if (event.target === shareModal) {
+    shareModal.classList.add("hidden");
+  }
+});
+
+copyShareLinkButton.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(shareLinkInput.value);
+    copyShareLinkButton.textContent = "복사됨";
+    setTimeout(() => {
+      copyShareLinkButton.textContent = "복사";
+    }, 1200);
+  } catch {
+    shareLinkInput.select();
+    document.execCommand("copy");
+  }
+});
+
+nativeShareButton.addEventListener("click", async () => {
+  const url = shareLinkInput.value || buildInviteLink(currentRoomCode);
+
+  if (!navigator.share) {
+    try {
+      await navigator.clipboard.writeText(url);
+      showMessage(lobbyMessage, "초대 링크를 복사했습니다.", "success");
+    } catch {
+      showMessage(lobbyMessage, "링크를 직접 복사해주세요.");
+    }
+    return;
+  }
+
+  try {
+    await navigator.share({
+      title: "BELL 카드게임",
+      text: `방 코드 ${currentRoomCode}에 참가하세요.`,
+      url
+    });
+  } catch (error) {
+    if (error.name !== "AbortError") {
+      console.warn("공유 실패:", error);
+    }
+  }
+});
+
 rulesButton.addEventListener("click", () => {
   rulesModal.classList.remove("hidden");
 });
@@ -1447,6 +1533,14 @@ if (savedNickname) nicknameInput.value = savedNickname;
 toggleSoundButton.textContent =
   soundEnabled ? "🔊" : "🔇";
 
+
+
+const invitedRoomCode = readRoomCodeFromUrl();
+
+if (invitedRoomCode.length === 6) {
+  roomCodeInput.value = invitedRoomCode;
+  inviteNotice.classList.remove("hidden");
+}
 
 async function attemptReconnect() {
   const savedRoomCode = localStorage.getItem("bellRoomCode");
