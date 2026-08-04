@@ -1127,3 +1127,79 @@ input::placeholder {
     width: 100%;
   }
 }
+
+
+.lobby-control-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin-bottom: 12px;
+}
+
+.ready-badge {
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: #102018;
+  background: var(--success);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.not-ready-badge {
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: white;
+  background: #59677a;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.kick-button {
+  width: auto;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 104, 104, 0.55);
+  border-radius: 9px;
+  color: #ff9ca0;
+  background: rgba(255, 104, 104, 0.09);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.danger-button {
+  color: white;
+  background: linear-gradient(180deg, #ff777d, #c93640);
+}
+
+.confirm-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+.team-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.team-chip.team-a-chip {
+  color: white;
+  background: #3470d4;
+}
+
+.team-chip.team-b-chip {
+  color: white;
+  background: #d83b45;
+}
+
+@media (max-width: 520px) {
+  .lobby-control-grid,
+  .confirm-grid {
+    grid-template-columns: 1fr;
+  }
+}

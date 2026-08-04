@@ -105,13 +105,26 @@ export async function joinRoom({ roomCode, user, nickname }) {
   const isReturningPlayer = Boolean(players[user.uid]);
   const playerCount = Object.keys(players).length;
 
+  const duplicateNickname = Object.entries(players)
+    .some(([playerUid, player]) => {
+      return (
+        playerUid !== user.uid &&
+        String(player.nickname ?? "").trim().toLowerCase() ===
+          String(nickname).trim().toLowerCase()
+      );
+    });
+
+  if (duplicateNickname) {
+    throw new Error("DUPLICATE_NICKNAME");
+  }
+
   if (!isReturningPlayer && playerCount >= 6) throw new Error("ROOM_FULL");
 
   await set(ref(db, `rooms/${roomCode}/players/${user.uid}`), {
     nickname,
     life: players[user.uid]?.life ?? 5,
     team: players[user.uid]?.team ?? null,
-    ready: true,
+    ready: false,
     online: true,
     roundWins: players[user.uid]?.roundWins ?? 0,
     teamRoundWins: players[user.uid]?.teamRoundWins ?? 0,
@@ -150,7 +163,35 @@ export async function changeMode(roomCode, uid, mode) {
 
   if (hostSnapshot.val() !== uid) throw new Error("HOST_ONLY");
 
-  await update(ref(db, `rooms/${roomCode}/meta`), { mode });
+  const roomRef = ref(db, `rooms/${roomCode}`);
+
+  await runTransaction(roomRef, (room) => {
+    if (!room || room.meta?.hostUid !== uid) return;
+
+    room.meta.mode = mode;
+    room.meta.updatedAt = Date.now();
+
+    const playerIds = Object.entries(room.players ?? {})
+      .sort(([, playerA], [, playerB]) => {
+        return Number(playerA.joinedAt ?? 0) -
+          Number(playerB.joinedAt ?? 0);
+      })
+      .map(([playerUid]) => playerUid);
+
+    playerIds.forEach((playerUid, index) => {
+      room.players[playerUid].ready =
+        playerUid === uid;
+
+      room.players[playerUid].team =
+        mode === "SOLO"
+          ? null
+          : index % 2 === 0
+            ? "A"
+            : "B";
+    });
+
+    return room;
+  });
 }
 
 
@@ -625,6 +666,98 @@ function finishCurrentTurn(game, uid) {
   game.turnNumber = Number(game.turnNumber ?? 0) + 1;
 }
 
+
+export async function setPlayerReady(roomCode, uid, ready) {
+  const playerRef = ref(
+    db,
+    `rooms/${roomCode}/players/${uid}`
+  );
+
+  const snapshot = await get(playerRef);
+
+  if (!snapshot.exists()) {
+    throw new Error("PLAYER_NOT_FOUND");
+  }
+
+  await update(playerRef, {
+    ready: Boolean(ready)
+  });
+}
+
+export async function shuffleTeams(roomCode, uid) {
+  const roomRef = ref(db, `rooms/${roomCode}`);
+
+  const result = await runTransaction(roomRef, (room) => {
+    if (!room || room.meta?.hostUid !== uid) return;
+    if (room.meta?.status !== "WAITING") return;
+
+    const mode = room.meta?.mode ?? "SOLO";
+
+    if (mode === "SOLO") return;
+
+    const playerIds = Object.entries(room.players ?? {})
+      .sort(([, playerA], [, playerB]) => {
+        return Number(playerA.joinedAt ?? 0) -
+          Number(playerB.joinedAt ?? 0);
+      })
+      .map(([playerUid]) => playerUid);
+
+    // Fisher-Yates
+    for (let index = playerIds.length - 1; index > 0; index -= 1) {
+      const randomIndex = Math.floor(
+        Math.random() * (index + 1)
+      );
+
+      [playerIds[index], playerIds[randomIndex]] =
+        [playerIds[randomIndex], playerIds[index]];
+    }
+
+    playerIds.forEach((playerUid, index) => {
+      room.players[playerUid].team =
+        index % 2 === 0 ? "A" : "B";
+
+      // 팀이 바뀌면 다시 준비하도록 함
+      room.players[playerUid].ready =
+        playerUid === room.meta.hostUid;
+    });
+
+    room.meta.updatedAt = Date.now();
+
+    return room;
+  });
+
+  if (!result.committed) {
+    throw new Error("HOST_ONLY");
+  }
+}
+
+export async function kickPlayer(
+  roomCode,
+  hostUid,
+  targetUid
+) {
+  const roomRef = ref(db, `rooms/${roomCode}`);
+
+  const result = await runTransaction(roomRef, (room) => {
+    if (!room || room.meta?.hostUid !== hostUid) return;
+    if (room.meta?.status !== "WAITING") return;
+    if (targetUid === hostUid) return;
+    if (!room.players?.[targetUid]) return;
+
+    delete room.players[targetUid];
+
+    room.meta.updatedAt = Date.now();
+    room.meta.kicked = room.meta.kicked ?? {};
+    room.meta.kicked[targetUid] = Date.now();
+
+    return room;
+  });
+
+  if (!result.committed) {
+    throw new Error("KICK_FAILED");
+  }
+}
+
 export async function startGame(roomCode, uid) {
   const roomRef = ref(db, `rooms/${roomCode}`);
 
@@ -643,6 +776,18 @@ export async function startGame(roomCode, uid) {
     if (isTeamMode(mode) && players.length !== requiredPlayers) return;
 
     const orderedPlayerIds = players.map(([playerUid]) => playerUid);
+
+    const everyoneReady = players.every(
+      ([playerUid, player]) => {
+        return (
+          playerUid === room.meta.hostUid ||
+          player.ready === true
+        );
+      }
+    );
+
+    if (!everyoneReady) return;
+
     assignTeams(room, orderedPlayerIds);
 
     const deck = shuffleDeck(createDeck());

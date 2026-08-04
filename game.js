@@ -4,6 +4,9 @@ import {
   joinRoom,
   watchRoom,
   changeMode,
+  setPlayerReady,
+  shuffleTeams,
+  kickPlayer,
   startGame,
   takeOpenCard,
   drawDeckCard,
@@ -52,6 +55,13 @@ const connectionStatus = document.querySelector("#connectionStatus");
 const playerList = document.querySelector("#playerList");
 const modeButtons = [...document.querySelectorAll(".mode-button")];
 const startGameButton = document.querySelector("#startGameButton");
+const readyButton = document.querySelector("#readyButton");
+const shuffleTeamsButton = document.querySelector("#shuffleTeamsButton");
+const kickModal = document.querySelector("#kickModal");
+const closeKickButton = document.querySelector("#closeKickButton");
+const cancelKickButton = document.querySelector("#cancelKickButton");
+const confirmKickButton = document.querySelector("#confirmKickButton");
+const kickTargetText = document.querySelector("#kickTargetText");
 const lobbyMessage = document.querySelector("#lobbyMessage");
 
 const gameBoard = document.querySelector("#gameBoard");
@@ -106,6 +116,7 @@ let unsubscribeConnection = null;
 let soundEnabled = localStorage.getItem("bellSoundEnabled") !== "false";
 let previousGameSnapshot = null;
 let deferredInstallPrompt = null;
+let kickTargetUid = null;
 
 
 function playTone(type) {
@@ -310,6 +321,9 @@ function friendlyError(error) {
 
   if (message === "ROOM_NOT_FOUND") return "존재하지 않는 방 코드입니다.";
   if (message === "ROOM_FULL") return "방 인원이 가득 찼습니다.";
+  if (message === "DUPLICATE_NICKNAME") return "이미 사용 중인 닉네임입니다.";
+  if (message === "PLAYER_NOT_FOUND") return "플레이어 정보를 찾지 못했습니다.";
+  if (message === "KICK_FAILED") return "플레이어를 내보내지 못했습니다.";
   if (message === "GAME_ALREADY_STARTED") return "이미 게임이 시작된 방입니다.";
   if (message === "HOST_ONLY") return "방장만 사용할 수 있습니다.";
   if (message === "START_FAILED") {
@@ -361,6 +375,26 @@ async function enterLobby(roomCode) {
       showMessage(lobbyMessage, "방이 종료됐습니다.", "error");
       localStorage.removeItem("bellRoomCode");
       setTimeout(() => showScreen("home"), 900);
+      return;
+    }
+
+    if (!room.players?.[currentUser?.uid]) {
+      showMessage(
+        homeMessage,
+        "방에서 나갔거나 방장에 의해 내보내졌습니다.",
+        "error"
+      );
+
+      localStorage.removeItem("bellRoomCode");
+
+      if (unsubscribeRoom) {
+        unsubscribeRoom();
+        unsubscribeRoom = null;
+      }
+
+      currentRoom = null;
+      currentRoomCode = "";
+      showScreen("home");
       return;
     }
 
@@ -421,24 +455,140 @@ function renderLobby(room) {
 
       const meta = document.createElement("div");
       meta.className = "player-meta";
-      const teamText = player.team ? ` · ${player.team}팀` : "";
       meta.textContent =
-        `라이프 ${"♥".repeat(player.life ?? 5)}${teamText}`;
+        `라이프 ${"♥".repeat(player.life ?? 5)}`;
+
+      if (player.team) {
+        const teamChip = document.createElement("span");
+        teamChip.className =
+          `team-chip ${
+            player.team === "A"
+              ? "team-a-chip"
+              : "team-b-chip"
+          }`;
+
+        teamChip.textContent = `${player.team}팀`;
+        name.append(teamChip);
+      }
+
+      const readyBadge = document.createElement("span");
+      readyBadge.className = player.ready
+        ? "ready-badge"
+        : "not-ready-badge";
+
+      readyBadge.textContent = player.ready
+        ? "준비"
+        : "대기";
+
+      name.append(readyBadge);
 
       const dot = document.createElement("div");
       dot.className = player.online ? "online-dot" : "online-dot offline-dot";
 
       info.append(name, meta);
       item.append(avatar, info, dot);
+
+      if (
+        isHost &&
+        uid !== currentUser?.uid &&
+        room.meta?.status === "WAITING"
+      ) {
+        const kickButton = document.createElement("button");
+        kickButton.className = "kick-button";
+        kickButton.type = "button";
+        kickButton.textContent = "내보내기";
+
+        kickButton.addEventListener("click", () => {
+          kickTargetUid = uid;
+          kickTargetText.textContent =
+            `${player.nickname}님을 방에서 내보낼까요?`;
+
+          kickModal.classList.remove("hidden");
+        });
+
+        item.append(kickButton);
+      }
+
       playerList.append(item);
     });
 
-  modeButtons.forEach((button) => {
+  
+readyButton.addEventListener("click", async () => {
+  const currentReady =
+    currentRoom?.players?.[currentUser?.uid]?.ready === true;
+
+  try {
+    await setPlayerReady(
+      currentRoomCode,
+      currentUser.uid,
+      !currentReady
+    );
+  } catch (error) {
+    showMessage(lobbyMessage, friendlyError(error), "error");
+  }
+});
+
+shuffleTeamsButton.addEventListener("click", async () => {
+  try {
+    await shuffleTeams(
+      currentRoomCode,
+      currentUser.uid
+    );
+
+    showMessage(
+      lobbyMessage,
+      "팀을 다시 섞었습니다. 전원이 다시 준비해야 합니다.",
+      "success"
+    );
+  } catch (error) {
+    showMessage(lobbyMessage, friendlyError(error), "error");
+  }
+});
+
+closeKickButton.addEventListener("click", () => {
+  kickTargetUid = null;
+  kickModal.classList.add("hidden");
+});
+
+cancelKickButton.addEventListener("click", () => {
+  kickTargetUid = null;
+  kickModal.classList.add("hidden");
+});
+
+kickModal.addEventListener("click", (event) => {
+  if (event.target === kickModal) {
+    kickTargetUid = null;
+    kickModal.classList.add("hidden");
+  }
+});
+
+confirmKickButton.addEventListener("click", async () => {
+  if (!kickTargetUid) return;
+
+  try {
+    await kickPlayer(
+      currentRoomCode,
+      currentUser.uid,
+      kickTargetUid
+    );
+
+    kickTargetUid = null;
+    kickModal.classList.add("hidden");
+
+    showMessage(
+      lobbyMessage,
+      "플레이어를 방에서 내보냈습니다.",
+      "success"
+    );
+  } catch (error) {
+    showMessage(lobbyMessage, friendlyError(error), "error");
+  }
+});
+
+modeButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.mode === room.meta?.mode);
     button.disabled = !isHost;
   });
-
-  startGameButton.classList.toggle("hidden", !isHost);
 
   const mode = room.meta?.mode ?? "SOLO";
   const requiredPlayers =
@@ -453,12 +603,46 @@ function renderLobby(room) {
       ? players.length >= 2
       : players.length === requiredPlayers;
 
-  startGameButton.disabled = !validCount;
-  startGameButton.textContent = validCount
-    ? "게임 시작"
-    : mode === "SOLO"
-      ? "2명 이상 필요합니다"
-      : `${requiredPlayers}명이 필요합니다`;
+  const everyoneReady = players.every(
+    ([uid, player]) => {
+      return (
+        uid === hostUid ||
+        player.ready === true
+      );
+    }
+  );
+
+  const myPlayer = room.players?.[currentUser?.uid];
+  const myReady = myPlayer?.ready === true;
+
+  readyButton.classList.toggle("hidden", isHost);
+  readyButton.textContent = myReady
+    ? "준비 취소"
+    : "준비하기";
+
+  readyButton.classList.toggle("primary", myReady);
+  readyButton.classList.toggle("secondary", !myReady);
+
+  shuffleTeamsButton.classList.toggle(
+    "hidden",
+    !isHost || mode === "SOLO"
+  );
+
+  startGameButton.classList.toggle("hidden", !isHost);
+  startGameButton.disabled =
+    !validCount || !everyoneReady;
+
+  if (!validCount) {
+    startGameButton.textContent =
+      mode === "SOLO"
+        ? "2명 이상 필요합니다"
+        : `${requiredPlayers}명이 필요합니다`;
+  } else if (!everyoneReady) {
+    startGameButton.textContent =
+      "모든 플레이어의 준비를 기다리는 중";
+  } else {
+    startGameButton.textContent = "게임 시작";
+  }
 }
 
 function createCardElement(card) {
@@ -1377,6 +1561,79 @@ copyRoomCodeButton.addEventListener("click", async () => {
     showMessage(lobbyMessage, "방 코드를 복사했습니다.", "success");
   } catch {
     showMessage(lobbyMessage, `방 코드: ${currentRoomCode}`);
+  }
+});
+
+
+readyButton.addEventListener("click", async () => {
+  const currentReady =
+    currentRoom?.players?.[currentUser?.uid]?.ready === true;
+
+  try {
+    await setPlayerReady(
+      currentRoomCode,
+      currentUser.uid,
+      !currentReady
+    );
+  } catch (error) {
+    showMessage(lobbyMessage, friendlyError(error), "error");
+  }
+});
+
+shuffleTeamsButton.addEventListener("click", async () => {
+  try {
+    await shuffleTeams(
+      currentRoomCode,
+      currentUser.uid
+    );
+
+    showMessage(
+      lobbyMessage,
+      "팀을 다시 섞었습니다. 전원이 다시 준비해야 합니다.",
+      "success"
+    );
+  } catch (error) {
+    showMessage(lobbyMessage, friendlyError(error), "error");
+  }
+});
+
+closeKickButton.addEventListener("click", () => {
+  kickTargetUid = null;
+  kickModal.classList.add("hidden");
+});
+
+cancelKickButton.addEventListener("click", () => {
+  kickTargetUid = null;
+  kickModal.classList.add("hidden");
+});
+
+kickModal.addEventListener("click", (event) => {
+  if (event.target === kickModal) {
+    kickTargetUid = null;
+    kickModal.classList.add("hidden");
+  }
+});
+
+confirmKickButton.addEventListener("click", async () => {
+  if (!kickTargetUid) return;
+
+  try {
+    await kickPlayer(
+      currentRoomCode,
+      currentUser.uid,
+      kickTargetUid
+    );
+
+    kickTargetUid = null;
+    kickModal.classList.add("hidden");
+
+    showMessage(
+      lobbyMessage,
+      "플레이어를 방에서 내보냈습니다.",
+      "success"
+    );
+  } catch (error) {
+    showMessage(lobbyMessage, friendlyError(error), "error");
   }
 });
 

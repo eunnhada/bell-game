@@ -75,6 +75,11 @@
           <button class="mode-button" data-mode="TEAM_3V3" type="button">3 VS 3</button>
         </div>
 
+        <div class="lobby-control-grid">
+          <button id="readyButton" class="button secondary" type="button">준비하기</button>
+          <button id="shuffleTeamsButton" class="button ghost hidden" type="button">팀 다시 섞기</button>
+        </div>
+
         <button id="startGameButton" class="button primary hidden" type="button">게임 시작</button>
         <p id="lobbyMessage" class="message" aria-live="polite"></p>
       </div>
@@ -201,6 +206,25 @@
         </section>
       </div>
     </section>
+
+    <div id="kickModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="kickTitle">
+      <div class="modal-card compact-modal">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">방장 기능</p>
+            <h2 id="kickTitle">플레이어 내보내기</h2>
+          </div>
+          <button id="closeKickButton" class="icon-button" type="button" aria-label="닫기">✕</button>
+        </div>
+
+        <p id="kickTargetText">이 플레이어를 방에서 내보낼까요?</p>
+
+        <div class="confirm-grid">
+          <button id="cancelKickButton" class="button ghost" type="button">취소</button>
+          <button id="confirmKickButton" class="button danger-button" type="button">내보내기</button>
+        </div>
+      </div>
+    </div>
 
     <div id="shareModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
       <div class="modal-card compact-modal">
