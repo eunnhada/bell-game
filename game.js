@@ -32,6 +32,9 @@ const createRoomButton = document.querySelector("#createRoomButton");
 const joinRoomButton = document.querySelector("#joinRoomButton");
 const homeMessage = document.querySelector("#homeMessage");
 const rulesButton = document.querySelector("#rulesButton");
+const installAppButton = document.querySelector("#installAppButton");
+const updateToast = document.querySelector("#updateToast");
+const reloadAppButton = document.querySelector("#reloadAppButton");
 const rulesModal = document.querySelector("#rulesModal");
 const closeRulesButton = document.querySelector("#closeRulesButton");
 
@@ -95,6 +98,7 @@ let lastRoundAdvanceKey = "";
 let unsubscribeConnection = null;
 let soundEnabled = localStorage.getItem("bellSoundEnabled") !== "false";
 let previousGameSnapshot = null;
+let deferredInstallPrompt = null;
 
 
 function playTone(type) {
@@ -1118,6 +1122,71 @@ function startTimer(game) {
   timerInterval = setInterval(updateTimer, 250);
 }
 
+
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  installAppButton.classList.remove("hidden");
+});
+
+installAppButton.addEventListener("click", async () => {
+  if (!deferredInstallPrompt) {
+    showMessage(
+      homeMessage,
+      "브라우저 메뉴에서 홈 화면에 추가를 선택해주세요."
+    );
+    return;
+  }
+
+  deferredInstallPrompt.prompt();
+
+  try {
+    await deferredInstallPrompt.userChoice;
+  } finally {
+    deferredInstallPrompt = null;
+    installAppButton.classList.add("hidden");
+  }
+});
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  installAppButton.classList.add("hidden");
+  showMessage(homeMessage, "BELL이 홈 화면에 설치됐습니다.", "success");
+});
+
+reloadAppButton.addEventListener("click", () => {
+  window.location.reload();
+});
+
+async function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+
+  try {
+    const registration = await navigator.serviceWorker.register(
+      "./sw.js",
+      { scope: "./" }
+    );
+
+    registration.addEventListener("updatefound", () => {
+      const worker = registration.installing;
+      if (!worker) return;
+
+      worker.addEventListener("statechange", () => {
+        if (
+          worker.state === "installed" &&
+          navigator.serviceWorker.controller
+        ) {
+          updateToast.classList.remove("hidden");
+        }
+      });
+    });
+  } catch (error) {
+    console.warn("서비스 워커 등록 실패:", error);
+  }
+}
+
+registerServiceWorker();
 
 rulesButton.addEventListener("click", () => {
   rulesModal.classList.remove("hidden");

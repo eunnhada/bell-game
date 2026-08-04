@@ -1025,3 +1025,49 @@ input::placeholder {
     grid-column: 2 / 4;
   }
 }
+
+
+.install-button {
+  margin-top: 14px;
+  color: #151006;
+  background: linear-gradient(180deg, #fff0b6, #f0ba45);
+}
+
+.update-toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 200;
+  width: min(calc(100% - 32px), 430px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  color: white;
+  background: #15243a;
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.55);
+}
+
+.update-toast button {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 10px;
+  color: #161006;
+  background: var(--gold);
+  font-weight: 900;
+}
+
+@media (display-mode: standalone) {
+  .install-button {
+    display: none !important;
+  }
+
+  body {
+    overscroll-behavior: none;
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$roomId": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        "meta": {
+          ".validate": "newData.hasChildren(['hostUid','status','mode'])"
+        },
+        "players": {
+          "$uid": {
+            ".validate": "newData.hasChildren(['nickname','life','online']) && newData.child('nickname').isString() && newData.child('nickname').val().length <= 10 && newData.child('life').isNumber() && newData.child('life').val() >= 0 && newData.child('life').val() <= 5"
+          }
+        }
+      }
+    }
+  }
+}

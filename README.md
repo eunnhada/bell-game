@@ -1,32 +1,50 @@
-# BELL 카드게임 Stage 8 — 완성도 및 재접속
+# BELL 카드게임 Stage 9 — PWA 및 배포 편의
 
-이번 단계에서 추가된 기능
+## 추가된 기능
 
-- 새로고침 후 기존 방 자동 재접속
-- Firebase 연결 상태 실시간 표시
-- 게임 로그 최근 12개 표시
-- 벨, 카드 뽑기, 버리기, 턴, 결과 효과음
-- 효과음 켜기/끄기
-- 내 턴 진동
-- 벨 진동
-- 핵심 규칙 모달
-- 모바일 및 가로 화면 게임 로그 배치
+- 휴대폰 홈 화면 설치
+- 앱 아이콘 192×192 / 512×512
+- 앱처럼 standalone 실행
+- 기본 화면 파일 캐시
+- 새 버전 감지 알림
+- 배포용 `publish.ps1`
+- 인증 사용자 전용 Firebase 규칙 예시
 
-## 재접속
+## 적용 방법
 
-같은 브라우저에서 새로고침하면 저장된 방 코드와 익명 UID를 확인해
-기존 방에 자동으로 다시 들어갑니다.
+압축 안의 모든 파일을 기존 `BELL-GAME` 폴더에 덮어씁니다.
 
-시크릿 창을 완전히 닫으면 익명 로그인 정보가 사라질 수 있습니다.
+추가되는 파일:
 
-## 효과음
+- `manifest.webmanifest`
+- `sw.js`
+- `assets/icon-192.png`
+- `assets/icon-512.png`
+- `publish.ps1`
+- `database.rules.production.json`
 
-별도 MP3 파일 없이 Web Audio API로 만들어져서 무료이며
-GitHub Pages에서도 추가 파일 없이 작동합니다.
+## GitHub 업데이트
 
-## 다음 단계
+```powershell
+git add .
+git commit -m "PWA 설치 기능 추가"
+git push
+```
 
-- 실제 휴대폰에서 UI 점검
-- GitHub 저장소 업로드
-- GitHub Pages 배포
-- Firebase 보안 규칙 강화
+또는:
+
+```powershell
+.\publish.ps1 -Message "PWA 설치 기능 추가"
+```
+
+## 휴대폰 설치
+
+- Android Chrome: `홈 화면에 설치` 버튼 또는 브라우저 메뉴의 `앱 설치`
+- iPhone Safari: 공유 버튼 → `홈 화면에 추가`
+
+## 중요
+
+실시간 멀티플레이는 Firebase 연결이 필요합니다. 오프라인 캐시는 메인 화면과 디자인 파일을 보관하는 용도입니다.
+
+`database.rules.production.json`은 인증 사용자만 접근하도록 제한하는 기본 예시입니다.
+현재 구조는 친구끼리 즐기는 버전이며 개발자 도구를 이용한 적극적인 부정행위까지 완전히 차단하는 서버 권한 구조는 아닙니다.

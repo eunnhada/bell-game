@@ -1,0 +1,26 @@
+{
+  "name": "BELL 카드게임",
+  "short_name": "BELL",
+  "description": "친구들과 즐기는 실시간 멀티플레이 카드게임",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#070d16",
+  "theme_color": "#0b1220",
+  "lang": "ko-KR",
+  "icons": [
+    {
+      "src": "./assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
