@@ -20,6 +20,8 @@ import {
   resetFinishedRoom,
   watchConnection,
   getRoom,
+  watchChat,
+  sendChatMessage,
   leaveRoom
 } from "./firebase.js";
 
@@ -81,6 +83,18 @@ const gameLeaveButton = document.querySelector("#gameLeaveButton");
 const fullscreenButton = document.querySelector("#fullscreenButton");
 const gameConnectionBadge = document.querySelector("#gameConnectionBadge");
 const gameLogList = document.querySelector("#gameLogList");
+const gameEffectOverlay = document.querySelector("#gameEffectOverlay");
+const gameEffectText = document.querySelector("#gameEffectText");
+const logTabButton = document.querySelector("#logTabButton");
+const chatTabButton = document.querySelector("#chatTabButton");
+const logTabPanel = document.querySelector("#logTabPanel");
+const chatTabPanel = document.querySelector("#chatTabPanel");
+const chatUnreadBadge = document.querySelector("#chatUnreadBadge");
+const chatMessageList = document.querySelector("#chatMessageList");
+const chatForm = document.querySelector("#chatForm");
+const chatInput = document.querySelector("#chatInput");
+const sendChatButton = document.querySelector("#sendChatButton");
+const quickChatButtons = [...document.querySelectorAll(".quick-chat-button")];
 const toggleSoundButton = document.querySelector("#toggleSoundButton");
 const opponentArea = document.querySelector("#opponentArea");
 const turnLabel = document.querySelector("#turnLabel");
@@ -123,8 +137,16 @@ let lastAutoSubmitKey = "";
 let lastResultAdvanceKey = "";
 let lastRoundAdvanceKey = "";
 let unsubscribeConnection = null;
+let unsubscribeChat = null;
 let soundEnabled = localStorage.getItem("bellSoundEnabled") !== "false";
 let previousGameSnapshot = null;
+let previousHandSize = 0;
+let previousOpenCardId = "";
+let chatMessages = [];
+let unreadChatCount = 0;
+let activeSideTab = "log";
+let effectTimeout = null;
+let lastDangerSecond = null;
 let deferredInstallPrompt = null;
 let kickTargetUid = null;
 let wakeLock = null;
@@ -221,6 +243,153 @@ function updateOrientationNotice() {
   );
 }
 
+
+function showGameEffect(text, type = "") {
+  if (effectTimeout) {
+    clearTimeout(effectTimeout);
+  }
+
+  gameEffectText.textContent = text;
+  gameEffectOverlay.className =
+    `game-effect-overlay${type ? ` ${type}` : ""}`;
+
+  gameEffectOverlay.classList.remove("hidden");
+
+  effectTimeout = setTimeout(() => {
+    gameEffectOverlay.classList.add("hidden");
+    gameEffectOverlay.className =
+      "game-effect-overlay hidden";
+  }, type === "bell-flash" ? 700 : 1050);
+}
+
+function triggerBellImpact() {
+  gameBoard.classList.remove("bell-impact");
+  void gameBoard.offsetWidth;
+  gameBoard.classList.add("bell-impact");
+
+  setTimeout(() => {
+    gameBoard.classList.remove("bell-impact");
+  }, 500);
+}
+
+function setSideTab(tab) {
+  activeSideTab = tab;
+
+  const chatActive = tab === "chat";
+
+  logTabButton.classList.toggle("active", !chatActive);
+  chatTabButton.classList.toggle("active", chatActive);
+
+  logTabPanel.classList.toggle("hidden", chatActive);
+  chatTabPanel.classList.toggle("hidden", !chatActive);
+
+  if (chatActive) {
+    unreadChatCount = 0;
+    updateUnreadBadge();
+    requestAnimationFrame(() => {
+      chatMessageList.scrollTop =
+        chatMessageList.scrollHeight;
+    });
+  }
+}
+
+function updateUnreadBadge() {
+  chatUnreadBadge.textContent = unreadChatCount;
+  chatUnreadBadge.classList.toggle(
+    "hidden",
+    unreadChatCount <= 0
+  );
+}
+
+function formatChatTime(timestamp) {
+  if (!timestamp) return "";
+
+  return new Date(timestamp).toLocaleTimeString(
+    "ko-KR",
+    {
+      hour: "2-digit",
+      minute: "2-digit"
+    }
+  );
+}
+
+function renderChat(messages) {
+  const previousLastId =
+    chatMessages.at(-1)?.id ?? null;
+
+  chatMessages = messages;
+  chatMessageList.innerHTML = "";
+
+  for (const message of messages) {
+    const item = document.createElement("div");
+    item.className = "chat-message";
+
+    if (message.uid === currentUser?.uid) {
+      item.classList.add("mine");
+    }
+
+    const meta = document.createElement("div");
+    meta.className = "chat-meta";
+
+    const name = document.createElement("span");
+    name.textContent = message.nickname ?? "플레이어";
+
+    const time = document.createElement("span");
+    time.textContent = formatChatTime(message.createdAt);
+
+    const text = document.createElement("div");
+    text.className = "chat-text";
+    text.textContent = message.text ?? "";
+
+    meta.append(name, time);
+    item.append(meta, text);
+    chatMessageList.append(item);
+  }
+
+  const newLastId = messages.at(-1)?.id ?? null;
+
+  if (
+    previousLastId &&
+    newLastId &&
+    previousLastId !== newLastId &&
+    activeSideTab !== "chat"
+  ) {
+    unreadChatCount += 1;
+    updateUnreadBadge();
+  }
+
+  chatMessageList.scrollTop =
+    chatMessageList.scrollHeight;
+}
+
+async function submitChat(text) {
+  const normalized = String(text ?? "").trim();
+
+  if (!normalized) return;
+
+  sendChatButton.disabled = true;
+
+  try {
+    await sendChatMessage(
+      currentRoomCode,
+      currentUser.uid,
+      currentRoom?.players?.[currentUser.uid]?.nickname ??
+        nicknameInput.value.trim() ??
+        "플레이어",
+      normalized
+    );
+
+    chatInput.value = "";
+  } catch (error) {
+    showMessage(
+      gameMessage,
+      friendlyError(error)
+    );
+  } finally {
+    sendChatButton.disabled = false;
+  }
+}
+
 function playTone(type) {
   if (!soundEnabled) return;
 
@@ -238,7 +407,9 @@ function playTone(type) {
       discard: { frequency: 270, duration: 0.15 },
       turn: { frequency: 660, duration: 0.18 },
       lose: { frequency: 160, duration: 0.4 },
-      win: { frequency: 740, duration: 0.5 }
+      win: { frequency: 740, duration: 0.5 },
+      chat: { frequency: 520, duration: 0.08 },
+      countdown: { frequency: 760, duration: 0.07 }
     }[type] ?? { frequency: 440, duration: 0.15 };
 
     oscillator.frequency.value = settings.frequency;
@@ -310,6 +481,7 @@ function handleGameEffects(room) {
     previousGame.turnUid !== currentUser?.uid
   ) {
     playTone("turn");
+    showGameEffect("내 차례!");
 
     if ("vibrate" in navigator) {
       navigator.vibrate([120, 60, 120]);
@@ -326,6 +498,8 @@ function handleGameEffects(room) {
 
     if (actionType === "BELL" || actionType === "AUTO_BELL_DECK_EMPTY") {
       playTone("bell");
+      triggerBellImpact();
+      showGameEffect("🔔 BELL!", "bell-flash");
     }
 
     if (actionType === "DRAW_DECK" || actionType === "AUTO_DRAW_DECK") {
@@ -345,6 +519,11 @@ function handleGameEffects(room) {
       currentGame.result?.lifeLosses?.[currentUser?.uid];
 
     playTone(myLoss ? "lose" : "win");
+
+    showGameEffect(
+      myLoss ? "라이프 감소" : "세트 생존!",
+      myLoss ? "lose-flash" : "win-flash"
+    );
   }
 
   previousGameSnapshot = structuredClone(currentGame);
@@ -433,6 +612,7 @@ function friendlyError(error) {
   if (message === "ROOM_FULL") return "방 인원이 가득 찼습니다.";
   if (message === "DUPLICATE_NICKNAME") return "이미 사용 중인 닉네임입니다.";
   if (message === "PLAYER_NOT_FOUND") return "플레이어 정보를 찾지 못했습니다.";
+  if (message === "EMPTY_CHAT") return "메시지를 입력해주세요.";
   if (message === "KICK_FAILED") return "플레이어를 내보내지 못했습니다.";
   if (message === "GAME_ALREADY_STARTED") return "이미 게임이 시작된 방입니다.";
   if (message === "HOST_ONLY") return "방장만 사용할 수 있습니다.";
@@ -479,6 +659,27 @@ async function enterLobby(roomCode) {
 
     gameConnectionBadge.classList.toggle("offline", !connected);
   });
+
+  if (unsubscribeChat) {
+    unsubscribeChat();
+  }
+
+  unsubscribeChat = watchChat(
+    roomCode,
+    (messages) => {
+      renderChat(messages);
+
+      const newest = messages.at(-1);
+
+      if (
+        newest &&
+        newest.uid !== currentUser?.uid &&
+        activeSideTab !== "chat"
+      ) {
+        playTone("chat");
+      }
+    }
+  );
 
   unsubscribeRoom = watchRoom(roomCode, (room) => {
     if (!room) {
@@ -1127,12 +1328,27 @@ function renderGame(room) {
     opponentArea.append(card);
   }
 
+  const currentOpenCardId = game.openCard?.id ?? "";
+  const openCardChanged =
+    previousOpenCardId &&
+    currentOpenCardId &&
+    previousOpenCardId !== currentOpenCardId;
+
   openCardSlot.innerHTML = "";
+
   if (game.openCard) {
-    openCardSlot.append(createCardElement(game.openCard));
+    const openCardElement = createCardElement(game.openCard);
+
+    if (openCardChanged) {
+      openCardElement.classList.add("open-card-change");
+    }
+
+    openCardSlot.append(openCardElement);
   } else {
     openCardSlot.textContent = "가져감";
   }
+
+  previousOpenCardId = currentOpenCardId;
 
   deckCount.textContent = `${Array.isArray(game.deck) ? game.deck.length : 0}장`;
 
@@ -1150,9 +1366,10 @@ function renderGame(room) {
     !(isMyTurn && game.phase === "TURN_ACTION" && !game.bellOwner);
 
   selectedDiscardCardId = isDiscardPhase ? selectedDiscardCardId : null;
+  const handGrew = myHand.length > previousHandSize;
   handCards.innerHTML = "";
 
-  myHand.forEach((card) => {
+  myHand.forEach((card, cardIndex) => {
     const button = document.createElement("button");
     button.className = "hand-card";
     button.type = "button";
@@ -1187,8 +1404,14 @@ function renderGame(room) {
       button.classList.add("submit-selected");
     }
 
+    if (handGrew && cardIndex === myHand.length - 1) {
+      button.classList.add("card-enter");
+    }
+
     handCards.append(button);
   });
+
+  previousHandSize = myHand.length;
 
   handCount.textContent = `${myHand.length} / ${isDiscardPhase ? 5 : 4}`;
   confirmDiscardButton.classList.toggle("hidden", !isDiscardPhase);
@@ -1290,6 +1513,22 @@ function startTimer(game) {
 
     timer.textContent = remaining;
     timer.classList.toggle("warning", remaining <= 5);
+
+    if (
+      remaining <= 5 &&
+      remaining > 0 &&
+      lastDangerSecond !== remaining
+    ) {
+      lastDangerSecond = remaining;
+      timer.classList.remove("tick-danger");
+      void timer.offsetWidth;
+      timer.classList.add("tick-danger");
+      playTone("countdown");
+    }
+
+    if (remaining > 5) {
+      lastDangerSecond = null;
+    }
 
     if (game.phase === "RESULT") {
       resultCountdown.textContent = remaining;
@@ -1440,6 +1679,26 @@ async function registerServiceWorker() {
 registerServiceWorker();
 
 
+
+
+logTabButton.addEventListener("click", () => {
+  setSideTab("log");
+});
+
+chatTabButton.addEventListener("click", () => {
+  setSideTab("chat");
+});
+
+chatForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await submitChat(chatInput.value);
+});
+
+quickChatButtons.forEach((button) => {
+  button.addEventListener("click", async () => {
+    await submitChat(button.dataset.message);
+  });
+});
 
 settingsButton.addEventListener("click", () => {
   settingsModal.classList.remove("hidden");
@@ -1920,6 +2179,14 @@ returnHomeButton.addEventListener("click", async () => {
     unsubscribeConnection = null;
   }
 
+  if (unsubscribeChat) {
+    unsubscribeChat();
+    unsubscribeChat = null;
+  }
+
+  chatMessages = [];
+  unreadChatCount = 0;
+  updateUnreadBadge();
   previousGameSnapshot = null;
   gameLogList.innerHTML = "";
   currentRoom = null;
@@ -1952,6 +2219,14 @@ async function handleLeave() {
     unsubscribeConnection = null;
   }
 
+  if (unsubscribeChat) {
+    unsubscribeChat();
+    unsubscribeChat = null;
+  }
+
+  chatMessages = [];
+  unreadChatCount = 0;
+  updateUnreadBadge();
   previousGameSnapshot = null;
   gameLogList.innerHTML = "";
   currentRoom = null;
@@ -2003,5 +2278,6 @@ async function attemptReconnect() {
 }
 
 applyAccessibilitySettings();
+setSideTab("log");
 updateOrientationNotice();
 attemptReconnect();

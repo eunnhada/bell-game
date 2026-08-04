@@ -16,7 +16,10 @@ import {
   onValue,
   onDisconnect,
   runTransaction,
-  serverTimestamp
+  serverTimestamp,
+  push,
+  query,
+  limitToLast
 } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -157,6 +160,62 @@ export async function getRoom(roomCode) {
   const snapshot = await get(ref(db, `rooms/${roomCode}`));
   return snapshot.exists() ? snapshot.val() : null;
 }
+
+export function watchChat(roomCode, callback) {
+  const chatRef = query(
+    ref(db, `rooms/${roomCode}/chat`),
+    limitToLast(50)
+  );
+
+  return onValue(chatRef, (snapshot) => {
+    const messages = [];
+
+    snapshot.forEach((child) => {
+      messages.push({
+        id: child.key,
+        ...child.val()
+      });
+    });
+
+    callback(messages);
+  });
+}
+
+export async function sendChatMessage(
+  roomCode,
+  uid,
+  nickname,
+  text
+) {
+  const normalized = String(text ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 80);
+
+  if (!normalized) {
+    throw new Error("EMPTY_CHAT");
+  }
+
+  const playerSnapshot = await get(
+    ref(db, `rooms/${roomCode}/players/${uid}`)
+  );
+
+  if (!playerSnapshot.exists()) {
+    throw new Error("PLAYER_NOT_FOUND");
+  }
+
+  const chatRef = push(
+    ref(db, `rooms/${roomCode}/chat`)
+  );
+
+  await set(chatRef, {
+    uid,
+    nickname: String(nickname ?? "플레이어").slice(0, 10),
+    text: normalized,
+    createdAt: Date.now()
+  });
+}
+
 
 export async function changeMode(roomCode, uid, mode) {
   const hostSnapshot = await get(ref(db, `rooms/${roomCode}/meta/hostUid`));

@@ -92,6 +92,10 @@
     </section>
 
     <section id="gameScreen" class="screen game-screen hidden">
+      <div id="gameEffectOverlay" class="game-effect-overlay hidden" aria-live="polite">
+        <div id="gameEffectText" class="game-effect-text">내 차례!</div>
+      </div>
+
       <div id="gameBoard" class="game-board">
         <header class="game-topbar">
           <div>
@@ -140,13 +144,44 @@
         </section>
 
         <aside id="gameLogPanel" class="game-log-panel">
-          <div class="hand-header">
-            <strong>게임 로그</strong>
+          <div class="side-panel-tabs">
+            <button id="logTabButton" class="side-tab active" type="button">게임 로그</button>
+            <button id="chatTabButton" class="side-tab" type="button">
+              채팅
+              <span id="chatUnreadBadge" class="unread-badge hidden">0</span>
+            </button>
             <button id="toggleSoundButton" class="icon-button" type="button" aria-label="효과음 켜기 또는 끄기">
               🔊
             </button>
           </div>
-          <ol id="gameLogList" class="game-log-list"></ol>
+
+          <div id="logTabPanel" class="side-tab-panel">
+            <ol id="gameLogList" class="game-log-list"></ol>
+          </div>
+
+          <div id="chatTabPanel" class="side-tab-panel hidden">
+            <div id="chatMessageList" class="chat-message-list"></div>
+
+            <form id="chatForm" class="chat-form">
+              <input
+                id="chatInput"
+                type="text"
+                maxlength="80"
+                placeholder="메시지 입력"
+                autocomplete="off"
+              >
+              <button id="sendChatButton" class="button primary small" type="submit">
+                전송
+              </button>
+            </form>
+
+            <div class="quick-chat-grid">
+              <button class="quick-chat-button" data-message="좋아!" type="button">좋아!</button>
+              <button class="quick-chat-button" data-message="잠깐!" type="button">잠깐!</button>
+              <button class="quick-chat-button" data-message="가자!" type="button">가자!</button>
+              <button class="quick-chat-button" data-message="아깝다!" type="button">아깝다!</button>
+            </div>
+          </div>
         </aside>
 
         <section class="hand-area">
