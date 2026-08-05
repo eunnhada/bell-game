@@ -6814,3 +6814,18 @@ body:not(.game-active) .version-badge {
     padding-inline: 8px !important;
   }
 }
+
+
+/* v26 stable actions */
+.table-zone button.action-pending,
+.table-zone button:disabled {
+  touch-action: manipulation;
+}
+
+.table-zone button:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.hand-cards {
+  gap: 14px !important;
+}

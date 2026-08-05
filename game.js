@@ -163,6 +163,7 @@ let effectTimeout = null;
 let lastDangerSecond = null;
 let previousMyLife = null;
 let lastTurnAnnouncementKey = "";
+let actionRequestPending = false;
 let sidePanelExpanded = false;
 let cardPreviewTimer = null;
 let deferredInstallPrompt = null;
@@ -716,6 +717,21 @@ function createTransferCard(card, sourceElement) {
   return { ghost, rect };
 }
 
+function findAddedCard(previousGame, currentGame, uid) {
+  const previousHand =
+    previousGame?.hands?.[uid] ?? [];
+  const currentHand =
+    currentGame?.hands?.[uid] ?? [];
+
+  const previousIds = new Set(
+    previousHand.map((card) => card.id)
+  );
+
+  return currentHand.find(
+    (card) => !previousIds.has(card.id)
+  ) ?? null;
+}
+
 function animateCardToPlayer(
   sourceElement,
   targetUid,
@@ -835,11 +851,18 @@ function handleGameEffects(room) {
       actionType === "DRAW_DECK" ||
       actionType === "AUTO_DRAW_DECK"
     ) {
+      const targetUid = currentGame.lastAction?.uid;
+      const addedCard = findAddedCard(
+        previousGame,
+        currentGame,
+        targetUid
+      );
+
       playCardWhoosh("DECK");
       animateCardToPlayer(
         deckButton,
-        currentGame.lastAction?.uid,
-        currentGame.lastAction?.card
+        targetUid,
+        addedCard
       );
     }
 
@@ -847,11 +870,18 @@ function handleGameEffects(room) {
       actionType === "TAKE_OPEN" ||
       actionType === "AUTO_TAKE_OPEN"
     ) {
+      const targetUid = currentGame.lastAction?.uid;
+      const addedCard = findAddedCard(
+        previousGame,
+        currentGame,
+        targetUid
+      );
+
       playCardWhoosh("OPEN");
       animateCardToPlayer(
         openCardButton,
-        currentGame.lastAction?.uid,
-        currentGame.lastAction?.card
+        targetUid,
+        addedCard
       );
     }
 
@@ -1015,7 +1045,9 @@ function friendlyError(error) {
   if (message === "START_FAILED") {
     return "인원을 확인해주세요. 2대2는 4명, 3대3은 6명이 필요합니다.";
   }
-  if (message === "INVALID_ACTION") return "현재 실행할 수 없는 행동입니다.";
+  if (message === "INVALID_ACTION") {
+    return "행동이 처리되지 않았습니다. 현재 턴과 타이머를 확인한 뒤 다시 눌러주세요.";
+  }
   if (message === "INVALID_ROUND_COUNT") return "3라운드 또는 5라운드를 선택해 주세요.";
   if (message === "ROUND_SETTING_FAILED") return "라운드 설정을 변경하지 못했습니다.";
   if (message === "START_FAILED") return "게임 시작 조건을 확인해 주세요.";
@@ -2785,20 +2817,52 @@ startGameButton.addEventListener("click", async () => {
 });
 
 openCardButton.addEventListener("click", async () => {
+  if (actionRequestPending) return;
+
+  actionRequestPending = true;
+  openCardButton.disabled = true;
+  deckButton.disabled = true;
+  bellButton.disabled = true;
+
   try {
     selectedDiscardCardId = null;
-    await takeOpenCard(currentRoomCode, currentUser.uid);
+    await takeOpenCard(
+      currentRoomCode,
+      currentUser.uid
+    );
   } catch (error) {
-    showMessage(gameMessage, friendlyError(error));
+    showMessage(
+      gameMessage,
+      friendlyError(error),
+      "error"
+    );
+  } finally {
+    actionRequestPending = false;
   }
 });
 
 deckButton.addEventListener("click", async () => {
+  if (actionRequestPending) return;
+
+  actionRequestPending = true;
+  openCardButton.disabled = true;
+  deckButton.disabled = true;
+  bellButton.disabled = true;
+
   try {
     selectedDiscardCardId = null;
-    await drawDeckCard(currentRoomCode, currentUser.uid);
+    await drawDeckCard(
+      currentRoomCode,
+      currentUser.uid
+    );
   } catch (error) {
-    showMessage(gameMessage, friendlyError(error));
+    showMessage(
+      gameMessage,
+      friendlyError(error),
+      "error"
+    );
+  } finally {
+    actionRequestPending = false;
   }
 });
 
@@ -2832,14 +2896,30 @@ submitCombinationButton.addEventListener("click", async () => {
 });
 
 bellButton.addEventListener("click", async () => {
+  if (actionRequestPending) return;
+
+  actionRequestPending = true;
+  openCardButton.disabled = true;
+  deckButton.disabled = true;
+  bellButton.disabled = true;
+
   try {
-    await pressBell(currentRoomCode, currentUser.uid);
+    await pressBell(
+      currentRoomCode,
+      currentUser.uid
+    );
 
     if ("vibrate" in navigator) {
       navigator.vibrate([160, 80, 220]);
     }
   } catch (error) {
-    showMessage(gameMessage, friendlyError(error));
+    showMessage(
+      gameMessage,
+      friendlyError(error),
+      "error"
+    );
+  } finally {
+    actionRequestPending = false;
   }
 });
 
@@ -2912,6 +2992,7 @@ returnHomeButton.addEventListener("click", async () => {
   previousGameSnapshot = null;
   previousMyLife = null;
   lastTurnAnnouncementKey = "";
+  actionRequestPending = false;
   gameLogList.innerHTML = "";
   currentRoom = null;
   currentRoomCode = "";

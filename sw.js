@@ -1,4 +1,4 @@
-const CACHE_NAME = "bell-game-v25-audited";
+const CACHE_NAME = "bell-game-v26-stable-actions";
 const APP_SHELL = [
   "./",
   "./index.html",

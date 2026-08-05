@@ -1080,10 +1080,9 @@ export async function takeOpenCard(roomCode, uid) {
     }
 
     const sourcePhase = game.phase;
-    const takenCard = game.openCard;
 
     const hand = Array.isArray(game.hands?.[uid]) ? [...game.hands[uid]] : [];
-    hand.push(takenCard);
+    hand.push(game.openCard);
 
     game.hands[uid] = hand;
     game.openCard = null;
@@ -1094,8 +1093,6 @@ export async function takeOpenCard(roomCode, uid) {
     game.lastAction = {
       type: "TAKE_OPEN",
       uid,
-      card: takenCard,
-      source: "OPEN",
       automatic: false,
       at: Date.now()
     };
@@ -1105,6 +1102,7 @@ export async function takeOpenCard(roomCode, uid) {
 
   if (!result.committed) throw new Error("INVALID_ACTION");
 }
+
 
 export async function drawDeckCard(roomCode, uid) {
   const roomRef = ref(db, `rooms/${roomCode}`);
@@ -1155,8 +1153,6 @@ export async function drawDeckCard(roomCode, uid) {
     game.lastAction = {
       type: "DRAW_DECK",
       uid,
-      card: drawnCard,
-      source: "DECK",
       automatic: false,
       at: Date.now()
     };
@@ -1166,6 +1162,7 @@ export async function drawDeckCard(roomCode, uid) {
 
   if (!result.committed) throw new Error("INVALID_ACTION");
 }
+
 
 export async function discardCard(roomCode, uid, cardId) {
   const roomRef = ref(db, `rooms/${roomCode}`);
