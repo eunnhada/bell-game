@@ -68,9 +68,7 @@ const playerCount = document.querySelector("#playerCount");
 const connectionStatus = document.querySelector("#connectionStatus");
 const playerList = document.querySelector("#playerList");
 const modeButtons = [...document.querySelectorAll(".mode-button")];
-const roundOptionButtons = [
-  ...document.querySelectorAll(".round-option-button")
-];
+const roundOptionButtons = [...document.querySelectorAll(".round-option-button")];
 const startGameButton = document.querySelector("#startGameButton");
 const readyButton = document.querySelector("#readyButton");
 const shuffleTeamsButton = document.querySelector("#shuffleTeamsButton");
@@ -119,6 +117,7 @@ const handCount = document.querySelector("#handCount");
 const handCards = document.querySelector("#handCards");
 const myPlayerName = document.querySelector("#myPlayerName");
 const myLifeDisplay = document.querySelector("#myLifeDisplay");
+const handArea = document.querySelector(".hand-area");
 const confirmDiscardButton = document.querySelector("#confirmDiscardButton");
 const submitControls = document.querySelector("#submitControls");
 const selectedScorePreview = document.querySelector("#selectedScorePreview");
@@ -137,6 +136,9 @@ const finalPanel = document.querySelector("#finalPanel");
 const finalScoreBoard = document.querySelector("#finalScoreBoard");
 const returnHomeButton = document.querySelector("#returnHomeButton");
 const returnLobbyButton = document.querySelector("#returnLobbyButton");
+const leaveConfirmModal = document.querySelector("#leaveConfirmModal");
+const cancelLeaveButton = document.querySelector("#cancelLeaveButton");
+const confirmLeaveButton = document.querySelector("#confirmLeaveButton");
 
 let currentUser = null;
 let currentRoomCode = "";
@@ -153,10 +155,9 @@ let unsubscribeConnection = null;
 let unsubscribeChat = null;
 let soundEnabled = localStorage.getItem("bellSoundEnabled") !== "false";
 let bgmEnabled = localStorage.getItem("bellBgmEnabled") !== "false";
-let bgmIntervalId = null;
+let audioContext = null;
+let bgmInterval = null;
 let bgmStep = 0;
-let sharedAudioContext = null;
-let lastTurnSoundKey = "";
 let previousGameSnapshot = null;
 let previousHandSize = 0;
 let previousOpenCardId = "";
@@ -166,6 +167,8 @@ let activeSideTab = "log";
 let effectTimeout = null;
 let lastDangerSecond = null;
 let previousMyLife = null;
+let lastTurnAnnouncementKey = "";
+let leaveConfirmResolver = null;
 let sidePanelExpanded = false;
 let cardPreviewTimer = null;
 let deferredInstallPrompt = null;
@@ -544,24 +547,94 @@ async function submitChat(text) {
 }
 
 function getAudioContext() {
-  if (!sharedAudioContext) {
-    const AudioContextClass =
-      window.AudioContext ||
-      window.webkitAudioContext;
+  const AudioContextClass =
+    window.AudioContext || window.webkitAudioContext;
 
-    sharedAudioContext =
-      new AudioContextClass();
+  if (!AudioContextClass) return null;
+
+  if (!audioContext) {
+    audioContext = new AudioContextClass();
   }
 
-  if (
-    sharedAudioContext.state === "suspended"
-  ) {
-    sharedAudioContext.resume().catch(
-      () => {}
-    );
-  }
+  return audioContext;
+}
 
-  return sharedAudioContext;
+async function unlockAudio() {
+  const context = getAudioContext();
+  if (context?.state === "suspended") {
+    try {
+      await context.resume();
+    } catch (error) {
+      console.debug("오디오 활성화 불가:", error);
+    }
+  }
+}
+
+function playTurnAlert() {
+  if (!soundEnabled) return;
+
+  try {
+    const context = getAudioContext();
+    if (!context) return;
+
+    const now = context.currentTime;
+    const notes = [660, 880, 1100];
+
+    notes.forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const start = now + index * 0.14;
+
+      oscillator.type = index === 2 ? "sine" : "triangle";
+      oscillator.frequency.setValueAtTime(frequency, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.2, start + 0.025);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.18);
+
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(start);
+      oscillator.stop(start + 0.2);
+    });
+
+    window.setTimeout(() => {
+      try {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.type = "sine";
+        oscillator.frequency.value = 1320;
+        gain.gain.setValueAtTime(0.16, context.currentTime);
+        gain.gain.exponentialRampToValueAtTime(
+          0.001,
+          context.currentTime + 0.25
+        );
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start();
+        oscillator.stop(context.currentTime + 0.26);
+      } catch (error) {
+        console.debug("추가 턴 알림음 재생 불가:", error);
+      }
+    }, 470);
+  } catch (error) {
+    console.debug("내 차례 알림음 재생 불가:", error);
+  }
+}
+
+function triggerMyTurnFeedback() {
+  playTurnAlert();
+  showGameEffect("🔔 내 차례입니다!");
+  gameBoard.classList.remove("my-turn-alert");
+  void gameBoard.offsetWidth;
+  gameBoard.classList.add("my-turn-alert");
+
+  window.setTimeout(() => {
+    gameBoard.classList.remove("my-turn-alert");
+  }, 1300);
+
+  if ("vibrate" in navigator) {
+    navigator.vibrate([180, 90, 180, 90, 260]);
+  }
 }
 
 function playTone(type) {
@@ -569,146 +642,77 @@ function playTone(type) {
 
   try {
     const context = getAudioContext();
-    const oscillator =
-      context.createOscillator();
+    if (!context) return;
+
+    const oscillator = context.createOscillator();
     const gain = context.createGain();
 
     const settings = {
-      bell: {
-        frequency: 880,
-        duration: 0.45
-      },
-      discard: {
-        frequency: 270,
-        duration: 0.15
-      },
-      turn: {
-        frequency: 720,
-        duration: 0.22
-      },
-      lose: {
-        frequency: 160,
-        duration: 0.4
-      },
-      win: {
-        frequency: 740,
-        duration: 0.5
-      },
-      chat: {
-        frequency: 520,
-        duration: 0.08
-      },
-      countdown: {
-        frequency: 820,
-        duration: 0.08
-      }
-    }[type] ?? {
-      frequency: 440,
-      duration: 0.15
-    };
+      bell: { frequency: 880, duration: 0.45 },
+      discard: { frequency: 270, duration: 0.15 },
+      turn: { frequency: 720, duration: 0.22 },
+      lose: { frequency: 160, duration: 0.4 },
+      win: { frequency: 740, duration: 0.5 },
+      chat: { frequency: 520, duration: 0.08 },
+      countdown: { frequency: 820, duration: 0.08 }
+    }[type] ?? { frequency: 440, duration: 0.15 };
 
-    oscillator.frequency.value =
-      settings.frequency;
+    oscillator.frequency.value = settings.frequency;
+    oscillator.type = type === "bell" ? "sine" : "triangle";
 
-    oscillator.type =
-      type === "bell"
-        ? "sine"
-        : "triangle";
-
-    gain.gain.setValueAtTime(
-      0.12,
-      context.currentTime
-    );
-
+    gain.gain.setValueAtTime(0.12, context.currentTime);
     gain.gain.exponentialRampToValueAtTime(
       0.001,
-      context.currentTime +
-        settings.duration
+      context.currentTime + settings.duration
     );
 
     oscillator.connect(gain);
     gain.connect(context.destination);
     oscillator.start();
-
-    oscillator.stop(
-      context.currentTime +
-        settings.duration
-    );
+    oscillator.stop(context.currentTime + settings.duration);
   } catch (error) {
-    console.debug(
-      "효과음 재생 불가:",
-      error
-    );
+    console.debug("효과음 재생 불가:", error);
   }
 }
 
-function playCardWhoosh(source) {
+function playCardWhoosh(source = "DECK") {
   if (!soundEnabled) return;
 
   try {
     const context = getAudioContext();
-    const duration = 0.2;
-    const frameCount = Math.max(
-      1,
-      Math.floor(
-        context.sampleRate * duration
-      )
-    );
+    if (!context) return;
 
+    const duration = 0.22;
+    const length = Math.floor(context.sampleRate * duration);
     const buffer = context.createBuffer(
       1,
-      frameCount,
+      length,
       context.sampleRate
     );
+    const data = buffer.getChannelData(0);
 
-    const samples =
-      buffer.getChannelData(0);
-
-    for (
-      let index = 0;
-      index < frameCount;
-      index += 1
-    ) {
-      const fade =
-        1 - index / frameCount;
-
-      samples[index] =
-        (Math.random() * 2 - 1) *
-        fade *
-        0.34;
+    for (let index = 0; index < length; index += 1) {
+      const fade = 1 - index / length;
+      data[index] =
+        (Math.random() * 2 - 1) * fade * 0.45;
     }
 
-    const noise =
-      context.createBufferSource();
-
-    const filter =
-      context.createBiquadFilter();
-
-    const gain =
-      context.createGain();
+    const noise = context.createBufferSource();
+    const filter = context.createBiquadFilter();
+    const gain = context.createGain();
 
     noise.buffer = buffer;
     filter.type = "bandpass";
-
     filter.frequency.setValueAtTime(
-      source === "OPEN"
-        ? 1500
-        : 1050,
+      source === "OPEN" ? 1500 : 1100,
       context.currentTime
     );
-
     filter.frequency.exponentialRampToValueAtTime(
-      source === "OPEN"
-        ? 520
-        : 360,
+      source === "OPEN" ? 480 : 340,
       context.currentTime + duration
     );
 
-    gain.gain.setValueAtTime(
-      0.11,
-      context.currentTime
-    );
-
+    gain.gain.setValueAtTime(0.14, context.currentTime);
     gain.gain.exponentialRampToValueAtTime(
       0.001,
       context.currentTime + duration
@@ -719,14 +723,11 @@ function playCardWhoosh(source) {
     gain.connect(context.destination);
     noise.start();
   } catch (error) {
-    console.debug(
-      "카드 효과음 재생 불가:",
-      error
-    );
+    console.debug("카드 효과음 재생 불가:", error);
   }
 }
 
-function playBgmStep() {
+function playBgmNote() {
   if (
     !bgmEnabled ||
     screens.game.classList.contains("hidden")
@@ -736,83 +737,99 @@ function playBgmStep() {
 
   try {
     const context = getAudioContext();
-    const notes = [
-      196,
-      220,
-      247,
-      220,
-      174,
-      196,
-      220,
-      247
-    ];
+    if (!context || context.state === "suspended") return;
 
-    const oscillator =
-      context.createOscillator();
-
-    const gain =
-      context.createGain();
+    const notes = [196, 220, 247, 294, 247, 220, 174, 196];
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
 
     oscillator.type = "sine";
-    oscillator.frequency.value =
-      notes[
-        bgmStep % notes.length
-      ];
-
-    gain.gain.setValueAtTime(
-      0.0001,
-      context.currentTime
-    );
-
+    oscillator.frequency.value = notes[bgmStep % notes.length];
+    gain.gain.setValueAtTime(0.0001, context.currentTime);
     gain.gain.exponentialRampToValueAtTime(
-      0.018,
+      0.022,
       context.currentTime + 0.04
     );
-
     gain.gain.exponentialRampToValueAtTime(
       0.0001,
-      context.currentTime + 0.52
+      context.currentTime + 0.62
     );
 
     oscillator.connect(gain);
     gain.connect(context.destination);
     oscillator.start();
-
-    oscillator.stop(
-      context.currentTime + 0.54
-    );
-
+    oscillator.stop(context.currentTime + 0.65);
     bgmStep += 1;
   } catch (error) {
-    console.debug(
-      "BGM 재생 불가:",
-      error
-    );
+    console.debug("BGM 재생 불가:", error);
   }
 }
 
 function startBgm() {
+  if (!bgmEnabled || bgmInterval) return;
+  playBgmNote();
+  bgmInterval = window.setInterval(playBgmNote, 720);
+}
+
+function stopBgm() {
+  if (!bgmInterval) return;
+  clearInterval(bgmInterval);
+  bgmInterval = null;
+}
+
+function findAddedCard(previousGame, currentGame, uid) {
+  const previousHand = previousGame?.hands?.[uid] ?? [];
+  const currentHand = currentGame?.hands?.[uid] ?? [];
+  const previousIds = new Set(
+    previousHand.map((card) => card.id)
+  );
+
+  return currentHand.find(
+    (card) => !previousIds.has(card.id)
+  ) ?? null;
+}
+
+function animateCardToPlayer(sourceElement, targetUid, card) {
   if (
-    !bgmEnabled ||
-    bgmIntervalId
+    accessibilitySettings.reducedMotion ||
+    !sourceElement ||
+    !targetUid
   ) {
     return;
   }
 
-  playBgmStep();
+  const target = targetUid === currentUser?.uid
+    ? handArea
+    : document.querySelector(
+        `.opponent-card[data-turn-uid="${targetUid}"]`
+      );
 
-  bgmIntervalId =
-    window.setInterval(
-      playBgmStep,
-      700
-    );
-}
+  if (!target) return;
 
-function stopBgm() {
-  if (!bgmIntervalId) return;
+  const sourceRect = sourceElement.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const ghost = document.createElement("div");
 
-  clearInterval(bgmIntervalId);
-  bgmIntervalId = null;
+  ghost.className = `card-transfer-ghost ${card?.color ?? ""}`;
+  ghost.textContent = card?.number ?? "";
+  ghost.style.left = `${sourceRect.left}px`;
+  ghost.style.top = `${sourceRect.top}px`;
+  ghost.style.width = `${Math.max(44, sourceRect.width * 0.45)}px`;
+  ghost.style.height = `${Math.max(62, sourceRect.height * 0.58)}px`;
+  document.body.append(ghost);
+
+  const moveX =
+    targetRect.left + targetRect.width / 2 - sourceRect.left;
+  const moveY =
+    targetRect.top + targetRect.height / 2 - sourceRect.top;
+
+  requestAnimationFrame(() => {
+    ghost.style.transform =
+      `translate(${moveX}px, ${moveY}px) scale(0.25)`;
+    ghost.style.opacity = "0";
+  });
+
+  setTimeout(() => ghost.remove(), 540);
 }
 
 function addLog(text) {
@@ -829,149 +846,27 @@ function addLog(text) {
   gameLogList.scrollTop = gameLogList.scrollHeight;
 }
 
-
-function findAddedCard(
-  previousGame,
-  currentGame,
-  uid
-) {
-  const previousHand =
-    previousGame?.hands?.[uid] ?? [];
-
-  const currentHand =
-    currentGame?.hands?.[uid] ?? [];
-
-  const previousIds = new Set(
-    previousHand.map(
-      (card) => card.id
-    )
-  );
-
-  return (
-    currentHand.find(
-      (card) =>
-        !previousIds.has(card.id)
-    ) ??
-    null
-  );
-}
-
-function animateCardToPlayer(
-  sourceElement,
-  targetUid,
-  card
-) {
-  if (
-    accessibilitySettings.reducedMotion ||
-    !sourceElement ||
-    !targetUid ||
-    !card
-  ) {
-    return;
-  }
-
-  const targetElement =
-    targetUid === currentUser?.uid
-      ? handCards
-      : document.querySelector(
-          `.opponent-card[data-turn-uid="${targetUid}"]`
-        );
-
-  if (!targetElement) return;
-
-  const sourceRect =
-    sourceElement.getBoundingClientRect();
-
-  const targetRect =
-    targetElement.getBoundingClientRect();
-
-  const ghost =
-    document.createElement("div");
-
-  ghost.className =
-    `card-transfer-ghost ${card.color}`;
-
-  ghost.textContent = card.number;
-
-  ghost.style.left =
-    `${sourceRect.left}px`;
-
-  ghost.style.top =
-    `${sourceRect.top}px`;
-
-  ghost.style.width =
-    `${Math.max(
-      42,
-      sourceRect.width
-    )}px`;
-
-  ghost.style.height =
-    `${Math.max(
-      60,
-      sourceRect.height
-    )}px`;
-
-  document.body.append(ghost);
-
-  const moveX =
-    targetRect.left +
-    targetRect.width / 2 -
-    sourceRect.left -
-    Math.max(
-      42,
-      sourceRect.width
-    ) / 2;
-
-  const moveY =
-    targetRect.top +
-    targetRect.height / 2 -
-    sourceRect.top -
-    Math.max(
-      60,
-      sourceRect.height
-    ) / 2;
-
-  requestAnimationFrame(() => {
-    ghost.style.transform =
-      `translate(${moveX}px, ${moveY}px) scale(0.24)`;
-
-    ghost.style.opacity = "0";
-  });
-
-  window.setTimeout(
-    () => ghost.remove(),
-    520
-  );
-}
-
 function actionToLog(room) {
   const action = room.game?.lastAction;
   if (!action) return "";
 
-  const name =
-    action.nickname ??
-    (
-      action.uid
-        ? getPlayerName(
-            room,
-            action.uid
-          )
-        : ""
-    );
+  const name = action.uid
+    ? getPlayerName(room, action.uid)
+    : "";
 
   const messages = {
     TAKE_OPEN: `${name}님이 오픈 카드를 가져갔습니다.`,
     DRAW_DECK: `${name}님이 더미 카드를 뽑았습니다.`,
     DISCARD: `${name}님이 카드를 버렸습니다.`,
     AUTO_DRAW_DECK: `${name}님이 자동으로 더미 카드를 뽑았습니다.`,
+    AUTO_TAKE_OPEN: `${name}님이 자동으로 오픈 카드를 가져갔습니다.`,
+    PLAYER_LEFT_SKIP: "나간 플레이어의 턴을 건너뛰었습니다.",
     AUTO_DISCARD: `${name}님이 자동으로 카드를 버렸습니다.`,
     BELL: `${name}님이 벨을 눌렀습니다!`,
     AUTO_BELL_DECK_EMPTY: "더미가 소진되어 자동 벨이 울렸습니다.",
     NEXT_SET: "다음 세트가 시작됐습니다.",
     NEXT_ROUND: "다음 라운드가 시작됐습니다.",
-    HOST_CHANGED: `${name}님이 새 방장이 됐습니다.`,
-    PLAYER_LEFT: `${name}님이 방을 나갔습니다.`,
-    PLAYER_LEFT_SKIP: `${name}님이 나가 해당 턴을 건너뛰었습니다.`
+    HOST_CHANGED: `${name}님이 새 방장이 됐습니다.`
   };
 
   return messages[action.type] ?? "";
@@ -979,114 +874,66 @@ function actionToLog(room) {
 
 function handleGameEffects(room) {
   const currentGame = room.game;
-  const previousGame =
-    previousGameSnapshot;
+  const previousGame = previousGameSnapshot;
 
   if (!currentGame) return;
 
-  const turnSoundKey =
+  const turnAnnouncementKey =
     `${currentGame.turnUid ?? ""}:` +
-    `${currentGame.turnNumber ?? 0}:` +
-    `${currentGame.phase ?? ""}`;
+    `${currentGame.turnNumber ?? 0}`;
 
   if (
-    currentGame.turnUid ===
-      currentUser?.uid &&
+    currentGame.turnUid === currentUser?.uid &&
     ["TURN_ACTION", "FINAL_TURNS"].includes(
       currentGame.phase
     ) &&
-    lastTurnSoundKey !==
-      turnSoundKey
+    lastTurnAnnouncementKey !== turnAnnouncementKey
   ) {
-    lastTurnSoundKey =
-      turnSoundKey;
-
-    playTone("turn");
-    showGameEffect("내 차례!");
-
-    if ("vibrate" in navigator) {
-      navigator.vibrate(
-        [120, 60, 120]
-      );
-    }
+    lastTurnAnnouncementKey = turnAnnouncementKey;
+    triggerMyTurnFeedback();
   }
 
   if (
-    previousGame?.lastAction?.at !==
-    currentGame.lastAction?.at
+    previousGame?.lastAction?.at !== currentGame.lastAction?.at
   ) {
-    const logText =
-      actionToLog(room);
-
+    const logText = actionToLog(room);
     addLog(logText);
 
-    const actionType =
-      currentGame.lastAction?.type;
+    const actionType = currentGame.lastAction?.type;
 
-    const targetUid =
-      currentGame.lastAction?.uid;
-
-    if (
-      actionType === "BELL" ||
-      actionType ===
-        "AUTO_BELL_DECK_EMPTY"
-    ) {
+    if (actionType === "BELL" || actionType === "AUTO_BELL_DECK_EMPTY") {
       playTone("bell");
       triggerBellImpact();
-
-      showGameEffect(
-        "🔔 BELL!",
-        "bell-flash"
-      );
+      showGameEffect("🔔 BELL!", "bell-flash");
     }
 
     if (
       actionType === "DRAW_DECK" ||
-      actionType ===
-        "AUTO_DRAW_DECK"
+      actionType === "AUTO_DRAW_DECK"
     ) {
-      const addedCard =
-        findAddedCard(
-          previousGame,
-          currentGame,
-          targetUid
-        );
-
+      const targetUid = currentGame.lastAction?.uid;
       playCardWhoosh("DECK");
-
       animateCardToPlayer(
         deckButton,
         targetUid,
-        addedCard
+        findAddedCard(previousGame, currentGame, targetUid)
       );
     }
 
     if (
       actionType === "TAKE_OPEN" ||
-      actionType ===
-        "AUTO_TAKE_OPEN"
+      actionType === "AUTO_TAKE_OPEN"
     ) {
-      const addedCard =
-        findAddedCard(
-          previousGame,
-          currentGame,
-          targetUid
-        );
-
+      const targetUid = currentGame.lastAction?.uid;
       playCardWhoosh("OPEN");
-
       animateCardToPlayer(
         openCardButton,
         targetUid,
-        addedCard
+        findAddedCard(previousGame, currentGame, targetUid)
       );
     }
 
-    if (
-      actionType === "DISCARD" ||
-      actionType ===
-        "AUTO_DISCARD"
-    ) {
+    if (actionType === "DISCARD" || actionType === "AUTO_DISCARD") {
       playTone("discard");
     }
   }
@@ -1096,29 +943,19 @@ function handleGameEffects(room) {
     currentGame.phase === "RESULT"
   ) {
     const myLoss =
-      currentGame.result
-        ?.lifeLosses
-        ?.[currentUser?.uid];
+      currentGame.result?.lifeLosses?.[currentUser?.uid];
 
-    playTone(
-      myLoss
-        ? "lose"
-        : "win"
-    );
+    playTone(myLoss ? "lose" : "win");
 
     showGameEffect(
-      myLoss
-        ? "라이프 감소"
-        : "세트 생존!",
-      myLoss
-        ? "lose-flash"
-        : "win-flash"
+      myLoss ? "라이프 감소" : "세트 생존!",
+      myLoss ? "lose-flash" : "win-flash"
     );
   }
 
-  previousGameSnapshot =
-    structuredClone(currentGame);
+  previousGameSnapshot = structuredClone(currentGame);
 }
+
 
 function buildInviteLink(roomCode) {
   const url = new URL(window.location.href);
@@ -1186,6 +1023,14 @@ function showScreen(name) {
   document.body.classList.toggle(
     "game-active",
     name === "game"
+  );
+  document.body.classList.toggle(
+    "screen-home",
+    name === "home"
+  );
+  versionBadge.classList.toggle(
+    "hidden",
+    name !== "home"
   );
 
   updateOrientationNotice();
@@ -1257,7 +1102,7 @@ function friendlyError(error) {
     return "인원을 확인해주세요. 2대2는 4명, 3대3은 6명이 필요합니다.";
   }
   if (message === "INVALID_ACTION") return "현재 실행할 수 없는 행동입니다.";
-  if (message === "INVALID_ROUND_COUNT") return "3라운드 또는 5라운드를 선택하세요.";
+  if (message === "INVALID_ROUND_COUNT") return "3라운드 또는 5라운드를 선택해주세요.";
   if (message === "ROUND_SETTING_FAILED") return "라운드 설정을 변경하지 못했습니다.";
   if (message === "RETURN_TO_LOBBY_FAILED") return "대기실로 돌아가지 못했습니다.";
 
@@ -1477,19 +1322,14 @@ modeButtons.forEach((button) => {
     button.disabled = !isHost;
   });
 
-  roundOptionButtons.forEach(
-    (button) => {
-      button.classList.toggle(
-        "active",
-        Number(button.dataset.rounds) ===
-          Number(
-            room.meta?.maxRounds ?? 5
-          )
-      );
-
-      button.disabled = !isHost;
-    }
-  );
+  roundOptionButtons.forEach((button) => {
+    button.classList.toggle(
+      "active",
+      Number(button.dataset.rounds) ===
+        Number(room.meta?.maxRounds ?? 5)
+    );
+    button.disabled = !isHost;
+  });
 
   const mode = room.meta?.mode ?? "SOLO";
   const requiredPlayers =
@@ -1716,10 +1556,14 @@ function renderResult(room) {
     const submission = game.submissions?.[uid];
     const selectedIds = submission?.cardIds ?? [];
     const hand = game.hands?.[uid] ?? [];
+    const submittedCards = Array.isArray(submission?.cards)
+      ? submission.cards
+      : hand.filter((item) => selectedIds.includes(item.id));
 
-    for (const card of hand.filter((item) => selectedIds.includes(item.id))) {
+    for (const card of submittedCards) {
       const mini = document.createElement("span");
       mini.className = `mini-card ${card.color}`;
+
       const colorNames = {
         red: "빨강",
         yellow: "노랑",
@@ -1727,8 +1571,16 @@ function renderResult(room) {
         blue: "파랑"
       };
 
-      mini.textContent =
-        `${colorNames[card.color] ?? card.color} ${card.number}`;
+      const colorLabel =
+        colorNames[card.color] ?? card.color;
+
+      mini.dataset.color = card.color;
+      mini.title = `${colorLabel} ${card.number}`;
+      mini.setAttribute(
+        "aria-label",
+        `${colorLabel} ${card.number}`
+      );
+      mini.textContent = `${colorLabel} ${card.number}`;
       cards.append(mini);
     }
 
@@ -1746,6 +1598,7 @@ function renderResult(room) {
     ) {
       const fourNumber =
         submission.rankValue ??
+        submittedCards[0]?.number ??
         hand.find(
           (card) => selectedIds.includes(card.id)
         )?.number ??
@@ -1833,16 +1686,14 @@ function renderRoundResult(room) {
       isTeamMode &&
       game.winningTeams?.includes(player.team);
 
-    if ((!isTeamMode && survivors.includes(uid)) || teamWon) {
+    const earnedPoints = Number(
+      game.roundPointAwards?.[uid] ?? 0
+    );
+
+    if (earnedPoints > 0) {
       const badge = document.createElement("span");
       badge.className = "round-badge";
-      const earnedPoints =
-        Number(
-          game.roundPointAwards?.[uid] ?? 0
-        );
-
-      badge.textContent =
-        `이번 라운드 +${earnedPoints}점`;
+      badge.textContent = `+${earnedPoints}점`;
       name.append(badge);
     }
 
@@ -1855,8 +1706,7 @@ function renderRoundResult(room) {
 
     const wins = document.createElement("div");
     wins.className = "score-number";
-    wins.textContent =
-      `${player.roundPoints ?? 0}점`;
+    wins.textContent = `${player.roundPoints ?? 0}점`;
 
     row.append(name, life, wins);
     roundScoreBoard.append(row);
@@ -1871,11 +1721,8 @@ function renderRoundResult(room) {
 
   roundResultMessage.textContent =
     `${eliminatedNames.join(", ")} 탈락 · 잠시 후 ${
-      Number(
-        room.meta?.round ?? 1
-      ) >= Number(
-        room.meta?.maxRounds ?? 5
-      )
+      Number(room.meta?.round ?? 1) >=
+        Number(room.meta?.maxRounds ?? 5)
         ? "최종 결과"
         : "다음 라운드"
     }로 이동합니다.`;
@@ -1916,7 +1763,9 @@ function renderFinalResult(room) {
       const detail = document.createElement("div");
       detail.className = "player-meta";
       detail.textContent =
-        `${members} · 생존 라이프 합계 ${
+        `${members} · 누적 승점 ${
+          stats[team]?.roundPoints ?? 0
+        }점 · 생존 라이프 합계 ${
           stats[team]?.totalRemainingLife ?? 0
         }`;
 
@@ -2039,9 +1888,7 @@ function renderGame(room) {
     ["TURN_ACTION", "FINAL_TURNS"].includes(game.phase);
 
   roundLabel.textContent =
-    `라운드 ${room.meta?.round ?? 1} / ${
-      room.meta?.maxRounds ?? 5
-    }`;
+    `라운드 ${room.meta?.round ?? 1} / ${room.meta?.maxRounds ?? 5}`;
   setLabel.textContent = `세트 ${room.meta?.set ?? 1}`;
 
   gameBoard.classList.toggle("is-my-turn", isMyTurn);
@@ -2340,36 +2187,26 @@ function startTimer(game) {
       }
     });
 
-    const dangerPhase = [
+    const playerTimerPhase = [
       "TURN_ACTION",
       "FINAL_TURNS",
       "DISCARD"
     ].includes(game.phase);
 
     if (
-      dangerPhase &&
+      playerTimerPhase &&
       remaining <= 5 &&
       remaining > 0 &&
       lastDangerSecond !== remaining
     ) {
       lastDangerSecond = remaining;
-      timer.classList.remove(
-        "tick-danger"
-      );
-
+      timer.classList.remove("tick-danger");
       void timer.offsetWidth;
-
-      timer.classList.add(
-        "tick-danger"
-      );
-
+      timer.classList.add("tick-danger");
       playTone("countdown");
     }
 
-    if (
-      !dangerPhase ||
-      remaining > 5
-    ) {
+    if (!playerTimerPhase || remaining > 5) {
       lastDangerSecond = null;
     }
 
@@ -2454,6 +2291,8 @@ function startTimer(game) {
   updateTimer();
   timerInterval = setInterval(updateTimer, 250);
 }
+
+
 
 window.addEventListener("beforeinstallprompt", (event) => {
   event.preventDefault();
@@ -2789,33 +2628,26 @@ toggleSoundButton.addEventListener("click", () => {
     soundEnabled ? "🔊" : "🔇";
 
   if (soundEnabled) {
-    playTone("turn");
+    playTurnAlert();
   }
 });
 
-toggleBgmButton.addEventListener(
-  "click",
-  () => {
-    bgmEnabled = !bgmEnabled;
+toggleBgmButton.addEventListener("click", async () => {
+  bgmEnabled = !bgmEnabled;
+  localStorage.setItem(
+    "bellBgmEnabled",
+    String(bgmEnabled)
+  );
 
-    localStorage.setItem(
-      "bellBgmEnabled",
-      String(bgmEnabled)
-    );
+  toggleBgmButton.textContent = bgmEnabled ? "🎵" : "🚫";
 
-    toggleBgmButton.textContent =
-      bgmEnabled
-        ? "🎵"
-        : "🚫";
-
-    if (bgmEnabled) {
-      startBgm();
-    } else {
-      stopBgm();
-    }
+  if (bgmEnabled) {
+    await unlockAudio();
+    startBgm();
+  } else {
+    stopBgm();
   }
-);
-
+});
 
 createRoomButton.addEventListener("click", async () => {
   const nickname = getNickname();
@@ -3016,31 +2848,24 @@ modeButtons.forEach((button) => {
   });
 });
 
-roundOptionButtons.forEach(
-  (button) => {
-    button.addEventListener(
-      "click",
-      async () => {
-        try {
-          await changeMaxRounds(
-            currentRoomCode,
-            currentUser.uid,
-            Number(
-              button.dataset.rounds
-            )
-          );
-        } catch (error) {
-          showMessage(
-            lobbyMessage,
-            friendlyError(error),
-            "error"
-          );
-        }
-      }
-    );
-  }
-);
 
+roundOptionButtons.forEach((button) => {
+  button.addEventListener("click", async () => {
+    try {
+      await changeMaxRounds(
+        currentRoomCode,
+        currentUser.uid,
+        Number(button.dataset.rounds)
+      );
+    } catch (error) {
+      showMessage(
+        lobbyMessage,
+        friendlyError(error),
+        "error"
+      );
+    }
+  });
+});
 
 startGameButton.addEventListener("click", async () => {
   try {
@@ -3124,6 +2949,7 @@ returnLobbyButton.addEventListener("click", async () => {
     selectedSubmitCardIds.clear();
     previousGameSnapshot = null;
     previousMyLife = null;
+    lastTurnAnnouncementKey = "";
     gameLogList.innerHTML = "";
     setSideTab("log");
 
@@ -3177,6 +3003,7 @@ returnHomeButton.addEventListener("click", async () => {
   updateUnreadBadge();
   previousGameSnapshot = null;
   previousMyLife = null;
+  lastTurnAnnouncementKey = "";
   gameLogList.innerHTML = "";
   currentRoom = null;
   currentRoomCode = "";
@@ -3184,11 +3011,40 @@ returnHomeButton.addEventListener("click", async () => {
   showScreen("home");
 });
 
-async function handleLeave() {
-  const confirmed = window.confirm(
-    "정말 방에서 나가시겠습니까?"
-  );
 
+function closeLeaveConfirmModal(confirmed) {
+  leaveConfirmModal.classList.add("hidden");
+
+  if (leaveConfirmResolver) {
+    leaveConfirmResolver(Boolean(confirmed));
+    leaveConfirmResolver = null;
+  }
+}
+
+function askLeaveConfirmation() {
+  leaveConfirmModal.classList.remove("hidden");
+
+  return new Promise((resolve) => {
+    leaveConfirmResolver = resolve;
+  });
+}
+
+cancelLeaveButton.addEventListener("click", () => {
+  closeLeaveConfirmModal(false);
+});
+
+confirmLeaveButton.addEventListener("click", () => {
+  closeLeaveConfirmModal(true);
+});
+
+leaveConfirmModal.addEventListener("click", (event) => {
+  if (event.target === leaveConfirmModal) {
+    closeLeaveConfirmModal(false);
+  }
+});
+
+async function handleLeave() {
+  const confirmed = await askLeaveConfirmation();
   if (!confirmed) return;
 
   if (currentRoomCode && currentUser) {
@@ -3240,11 +3096,24 @@ if (savedNickname) nicknameInput.value = savedNickname;
 
 toggleSoundButton.textContent =
   soundEnabled ? "🔊" : "🔇";
-
 toggleBgmButton.textContent =
   bgmEnabled ? "🎵" : "🚫";
 
+window.addEventListener(
+  "pointerdown",
+  () => {
+    unlockAudio();
+  },
+  { once: true }
+);
 
+window.addEventListener(
+  "keydown",
+  () => {
+    unlockAudio();
+  },
+  { once: true }
+);
 
 const invitedRoomCode = readRoomCodeFromUrl();
 
@@ -3287,28 +3156,3 @@ if (isMobileViewport()) {
 applySidePanelState();
 updateOrientationNotice();
 attemptReconnect();
-
-
-document.addEventListener(
-  "pointerdown",
-  () => {
-    try {
-      getAudioContext();
-
-      if (
-        bgmEnabled &&
-        !screens.game.classList.contains(
-          "hidden"
-        )
-      ) {
-        startBgm();
-      }
-    } catch (error) {
-      console.debug(
-        "오디오 시작 대기:",
-        error
-      );
-    }
-  },
-  { once: true }
-);

@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <div id="versionBadge" class="version-badge">v29</div>
+  <div id="versionBadge" class="version-badge">v26-result</div>
   <main id="app" class="app">
     <section id="homeScreen" class="screen home-screen">
       <div class="brand">
@@ -82,15 +82,11 @@
           <button class="mode-button" data-mode="TEAM_3V3" type="button">3 VS 3</button>
         </div>
 
-        <div class="round-setting">
+        <div class="round-setting" aria-label="전체 라운드 설정">
           <strong>전체 라운드</strong>
           <div class="round-option-grid">
-            <button class="round-option-button" data-rounds="3" type="button">
-              3라운드
-            </button>
-            <button class="round-option-button active" data-rounds="5" type="button">
-              5라운드
-            </button>
+            <button class="round-option-button" data-rounds="3" type="button">3라운드</button>
+            <button class="round-option-button active" data-rounds="5" type="button">5라운드</button>
           </div>
         </div>
 
@@ -373,6 +369,23 @@
       </div>
     </div>
 
+
+    <div id="leaveConfirmModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="leaveConfirmTitle">
+      <div class="modal-card compact-modal">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">나가기 확인</p>
+            <h2 id="leaveConfirmTitle">정말 나가시겠습니까?</h2>
+          </div>
+        </div>
+        <p>현재 방과 게임에서 나가게 됩니다.</p>
+        <div class="confirm-grid">
+          <button id="cancelLeaveButton" class="button ghost" type="button">아니오</button>
+          <button id="confirmLeaveButton" class="button danger-button" type="button">예, 나가기</button>
+        </div>
+      </div>
+    </div>
+
     <div id="shareModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
       <div class="modal-card compact-modal">
         <div class="modal-header">
@@ -427,7 +440,7 @@
 
           <section>
             <h3>라이프와 라운드</h3>
-            <p>모든 플레이어는 라운드마다 라이프 5개로 시작합니다. 한 명이 라이프 0이 되면 라운드가 끝납니다. 방 설정에서 3라운드 또는 5라운드를 선택할 수 있습니다.</p>
+            <p>모든 플레이어는 라운드마다 라이프 5개로 시작합니다. 한 명이 라이프 0이 되면 라운드가 끝납니다. 방장이 3라운드 또는 5라운드를 선택합니다. 라운드 순위에 따라 승점이 누적됩니다.</p>
           </section>
 
           <section>

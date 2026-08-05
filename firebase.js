@@ -85,6 +85,7 @@ export async function createRoom({ roomCode, user, nickname }) {
           roundWins: 0,
           teamRoundWins: 0,
           roundPoints: 0,
+          roundScoreTotal: 0,
           totalRemainingLife: 0,
           joinedAt: Date.now()
         }
@@ -134,6 +135,7 @@ export async function joinRoom({ roomCode, user, nickname }) {
     roundWins: players[user.uid]?.roundWins ?? 0,
     teamRoundWins: players[user.uid]?.teamRoundWins ?? 0,
     roundPoints: players[user.uid]?.roundPoints ?? 0,
+    roundScoreTotal: players[user.uid]?.roundScoreTotal ?? 0,
     totalRemainingLife: players[user.uid]?.totalRemainingLife ?? 0,
     joinedAt: players[user.uid]?.joinedAt ?? Date.now()
   });
@@ -254,6 +256,31 @@ export async function changeMode(roomCode, uid, mode) {
 
     return room;
   });
+}
+
+
+export async function changeMaxRounds(roomCode, uid, maxRounds) {
+  const rounds = Number(maxRounds);
+
+  if (![3, 5].includes(rounds)) {
+    throw new Error("INVALID_ROUND_COUNT");
+  }
+
+  const roomRef = ref(db, `rooms/${roomCode}`);
+
+  const result = await runTransaction(roomRef, (room) => {
+    if (!room) return;
+    if (room.meta?.hostUid !== uid) return;
+    if (room.meta?.status !== "WAITING") return;
+
+    room.meta.maxRounds = rounds;
+    room.meta.updatedAt = Date.now();
+    return room;
+  });
+
+  if (!result.committed) {
+    throw new Error("ROUND_SETTING_FAILED");
+  }
 }
 
 
@@ -474,6 +501,9 @@ function evaluateSet(room) {
 
   for (const uid of playerIds) {
     scores[uid] = Number(submissions[uid]?.score ?? 0);
+    players[uid].roundScoreTotal =
+      Number(players[uid].roundScoreTotal ?? 0) +
+      scores[uid];
   }
 
   const comparisonIds =
@@ -576,8 +606,7 @@ function evaluateSet(room) {
     !highestUids.includes(bellOwner);
 
   if (bellFailed) {
-    // 잘못 벨을 누른 사람만 라이프 2개 감소.
-    // 다른 최고점·최저점 플레이어는 라이프를 잃지 않는다.
+    // 벨을 잘못 누른 경우에는 벨을 누른 사람만 라이프 2개 감소.
     lifeLosses[bellOwner] = Math.max(
       lifeLosses[bellOwner] ?? 0,
       2
@@ -619,27 +648,6 @@ function evaluateSet(room) {
 }
 
 
-function pointsByDistinctScore(scoreValues) {
-  const uniqueScores = [
-    ...new Set(
-      scoreValues.map((value) => Number(value ?? 0))
-    )
-  ].sort((scoreA, scoreB) => scoreB - scoreA);
-
-  const points = {};
-
-  uniqueScores.forEach((score, index) => {
-    points[score] =
-      index === 0
-        ? 2
-        : index === 1
-          ? 1
-          : 0;
-  });
-
-  return points;
-}
-
 function awardRoundPoints(room) {
   const players = room.players ?? {};
   const playerIds = Object.keys(players);
@@ -647,183 +655,84 @@ function awardRoundPoints(room) {
   const awards = {};
 
   if (teamMode) {
-    const teamLife = {};
+    const teamStats = {};
 
     for (const uid of playerIds) {
-      const team = players[uid]?.team;
+      const player = players[uid];
+      const team = player?.team;
       if (!team) continue;
 
-      teamLife[team] =
-        Number(teamLife[team] ?? 0) +
-        Number(players[uid]?.life ?? 0);
-    }
+      teamStats[team] = teamStats[team] ?? {
+        life: 0,
+        score: 0
+      };
 
-    const pointMap = pointsByDistinctScore(
-      Object.values(teamLife)
-    );
-
-    for (const uid of playerIds) {
-      const team = players[uid]?.team;
-      const earned = Number(
-        pointMap[Number(teamLife[team] ?? 0)] ?? 0
+      teamStats[team].life += Number(player.life ?? 0);
+      teamStats[team].score += Number(
+        player.roundScoreTotal ?? 0
       );
-
-      players[uid].roundPoints =
-        Number(players[uid].roundPoints ?? 0) +
-        earned;
-
-      awards[uid] = earned;
     }
 
-    room.game.roundTeamLife = teamLife;
-  } else {
-    const pointMap = pointsByDistinctScore(
-      playerIds.map(
-        (uid) => Number(players[uid]?.life ?? 0)
-      )
+    const ranking = Object.keys(teamStats).sort(
+      (teamA, teamB) => {
+        const lifeDiff =
+          teamStats[teamB].life - teamStats[teamA].life;
+        if (lifeDiff !== 0) return lifeDiff;
+
+        const scoreDiff =
+          teamStats[teamB].score - teamStats[teamA].score;
+        if (scoreDiff !== 0) return scoreDiff;
+
+        return teamA.localeCompare(teamB);
+      }
     );
 
+    const teamAwards = {};
+    ranking.forEach((team, index) => {
+      teamAwards[team] = index === 0 ? 2 : index === 1 ? 1 : 0;
+    });
+
     for (const uid of playerIds) {
-      const life = Number(players[uid]?.life ?? 0);
-      const earned = Number(pointMap[life] ?? 0);
-
+      const points = Number(
+        teamAwards[players[uid]?.team] ?? 0
+      );
+      awards[uid] = points;
       players[uid].roundPoints =
-        Number(players[uid].roundPoints ?? 0) +
-        earned;
-
-      awards[uid] = earned;
+        Number(players[uid].roundPoints ?? 0) + points;
     }
+
+    room.game.roundTeamRanking = ranking;
+    room.game.roundTeamStats = teamStats;
+  } else {
+    const ranking = [...playerIds].sort((uidA, uidB) => {
+      const playerA = players[uidA];
+      const playerB = players[uidB];
+
+      const lifeDiff =
+        Number(playerB.life ?? 0) -
+        Number(playerA.life ?? 0);
+      if (lifeDiff !== 0) return lifeDiff;
+
+      const scoreDiff =
+        Number(playerB.roundScoreTotal ?? 0) -
+        Number(playerA.roundScoreTotal ?? 0);
+      if (scoreDiff !== 0) return scoreDiff;
+
+      return Number(playerA.joinedAt ?? 0) -
+        Number(playerB.joinedAt ?? 0);
+    });
+
+    ranking.forEach((uid, index) => {
+      const points = index === 0 ? 2 : index === 1 ? 1 : 0;
+      awards[uid] = points;
+      players[uid].roundPoints =
+        Number(players[uid].roundPoints ?? 0) + points;
+    });
+
+    room.game.roundRanking = ranking;
   }
 
   room.game.roundPointAwards = awards;
-}
-
-function removePlayerFromActiveGame(
-  room,
-  uid,
-  nickname
-) {
-  const game = room.game;
-
-  if (!game) return;
-
-  const wasCurrentTurn =
-    game.turnUid === uid;
-
-  const originalTurnOrder = Array.isArray(
-    game.turnOrder
-  )
-    ? [...game.turnOrder]
-    : [];
-
-  const originalTurnIndex = Math.max(
-    0,
-    originalTurnOrder.indexOf(uid)
-  );
-
-  game.turnOrder = originalTurnOrder.filter(
-    (playerUid) => playerUid !== uid
-  );
-
-  if (game.hands) {
-    delete game.hands[uid];
-  }
-
-  if (game.submissions) {
-    delete game.submissions[uid];
-  }
-
-  if (Array.isArray(game.finalTurnQueue)) {
-    const originalQueue = [...game.finalTurnQueue];
-    const originalQueueIndex = Math.max(
-      0,
-      originalQueue.indexOf(uid)
-    );
-
-    game.finalTurnQueue = originalQueue.filter(
-      (playerUid) => playerUid !== uid
-    );
-
-    if (
-      wasCurrentTurn &&
-      game.phase === "FINAL_TURNS"
-    ) {
-      if (game.finalTurnQueue.length === 0) {
-        prepareSubmitPhase(game);
-      } else if (
-        originalQueueIndex <
-        game.finalTurnQueue.length
-      ) {
-        game.finalTurnIndex =
-          originalQueueIndex;
-        game.turnUid =
-          game.finalTurnQueue[originalQueueIndex];
-        game.turnStartedAt = Date.now();
-        game.turnNumber =
-          Number(game.turnNumber ?? 0) + 1;
-      } else {
-        prepareSubmitPhase(game);
-      }
-    } else if (
-      game.phase === "FINAL_TURNS" &&
-      game.turnUid
-    ) {
-      game.finalTurnIndex = Math.max(
-        0,
-        game.finalTurnQueue.indexOf(
-          game.turnUid
-        )
-      );
-    }
-  }
-
-  if (
-    wasCurrentTurn &&
-    ["TURN_ACTION", "DISCARD"].includes(
-      game.phase
-    )
-  ) {
-    game.previousPhase = null;
-    game.drawSource = null;
-
-    if (game.turnOrder.length > 0) {
-      const nextIndex =
-        originalTurnIndex <
-        game.turnOrder.length
-          ? originalTurnIndex
-          : 0;
-
-      game.phase = "TURN_ACTION";
-      game.turnIndex = nextIndex;
-      game.turnUid =
-        game.turnOrder[nextIndex];
-      game.turnStartedAt = Date.now();
-      game.turnNumber =
-        Number(game.turnNumber ?? 0) + 1;
-    } else {
-      game.turnUid = null;
-    }
-  } else if (
-    game.turnUid &&
-    Array.isArray(game.turnOrder)
-  ) {
-    game.turnIndex = Math.max(
-      0,
-      game.turnOrder.indexOf(
-        game.turnUid
-      )
-    );
-  }
-
-  game.lastAction = {
-    type: wasCurrentTurn
-      ? "PLAYER_LEFT_SKIP"
-      : "PLAYER_LEFT",
-    uid: null,
-    nickname,
-    automatic: true,
-    at: Date.now()
-  };
 }
 
 function beginNextSet(room) {
@@ -1149,39 +1058,6 @@ export async function kickPlayer(
   }
 }
 
-
-export async function changeMaxRounds(
-  roomCode,
-  uid,
-  maxRounds
-) {
-  const value = Number(maxRounds);
-
-  if (![3, 5].includes(value)) {
-    throw new Error("INVALID_ROUND_COUNT");
-  }
-
-  const roomRef = ref(db, `rooms/${roomCode}`);
-
-  const result = await runTransaction(
-    roomRef,
-    (room) => {
-      if (!room) return;
-      if (room.meta?.hostUid !== uid) return;
-      if (room.meta?.status !== "WAITING") return;
-
-      room.meta.maxRounds = value;
-      room.meta.updatedAt = Date.now();
-
-      return room;
-    }
-  );
-
-  if (!result.committed) {
-    throw new Error("ROUND_SETTING_FAILED");
-  }
-}
-
 export async function startGame(roomCode, uid) {
   const roomRef = ref(db, `rooms/${roomCode}`);
 
@@ -1223,6 +1099,7 @@ export async function startGame(roomCode, uid) {
       room.players[playerUid].roundWins = 0;
       room.players[playerUid].teamRoundWins = 0;
       room.players[playerUid].roundPoints = 0;
+      room.players[playerUid].roundScoreTotal = 0;
       room.players[playerUid].totalRemainingLife = 0;
     }
 
@@ -1609,8 +1486,17 @@ export async function submitCombination(
       : selectedSubmission(hand, cardIds, teamMode);
 
     room.game.submissions = room.game.submissions ?? {};
+    const submittedCards = hand
+      .filter((card) => evaluated.cardIds.includes(card.id))
+      .map((card) => ({
+        id: card.id,
+        color: card.color,
+        number: card.number
+      }));
+
     room.game.submissions[uid] = {
       cardIds: evaluated.cardIds,
+      cards: submittedCards,
       score: evaluated.score,
       rankTier: evaluated.rankTier ?? 1,
       rankValue: evaluated.rankValue ?? evaluated.score,
@@ -1651,8 +1537,17 @@ export async function autoSubmitMissing(roomCode) {
 
       const evaluated = bestCombination(hand);
 
+      const submittedCards = hand
+        .filter((card) => evaluated.cardIds.includes(card.id))
+        .map((card) => ({
+          id: card.id,
+          color: card.color,
+          number: card.number
+        }));
+
       submissions[uid] = {
         cardIds: evaluated.cardIds,
+        cards: submittedCards,
         score: evaluated.score,
         rankTier: evaluated.rankTier ?? 1,
         rankValue: evaluated.rankValue ?? evaluated.score,
@@ -1694,9 +1589,7 @@ export async function advanceAfterRound(roomCode) {
     const playerIds = Object.keys(room.players ?? {});
     const teamMode = isTeamMode(room.meta?.mode);
 
-    const maxRounds = Number(
-      room.meta?.maxRounds ?? 5
-    );
+    const maxRounds = Number(room.meta?.maxRounds ?? 5);
 
     if (currentRound >= maxRounds) {
       room.meta.status = "FINISHED";
@@ -1719,9 +1612,7 @@ export async function advanceAfterRound(roomCode) {
 
           teamStats[team].roundPoints = Math.max(
             teamStats[team].roundPoints,
-            Number(
-              room.players[uid].roundPoints ?? 0
-            )
+            Number(room.players[uid].roundPoints ?? 0)
           );
 
           teamStats[team].teamRoundWins = Math.max(
@@ -1789,6 +1680,7 @@ export async function advanceAfterRound(roomCode) {
 
     for (const uid of playerIds) {
       room.players[uid].life = 5;
+      room.players[uid].roundScoreTotal = 0;
       hands[uid] = deck.splice(0, 4);
     }
 
@@ -1826,6 +1718,7 @@ export async function advanceAfterRound(roomCode) {
   return result.committed;
 }
 
+
 export async function returnFinishedGameToLobby(
   roomCode,
   uid
@@ -1858,6 +1751,7 @@ export async function returnFinishedGameToLobby(
       player.roundWins = 0;
       player.teamRoundWins = 0;
       player.roundPoints = 0;
+      player.roundScoreTotal = 0;
       player.totalRemainingLife = 0;
     }
 
@@ -1884,88 +1778,166 @@ export async function resetFinishedRoom(roomCode, uid) {
   }
 }
 
-export async function leaveRoom(
-  roomCode,
-  uid
-) {
-  const roomRef = ref(
-    db,
-    `rooms/${roomCode}`
-  );
 
-  await runTransaction(
-    roomRef,
-    (room) => {
-      if (!room) return null;
+function nextRemainingPlayerUid(order, removedUid, remainingIds) {
+  const list = Array.isArray(order) ? order : [];
+  const remaining = new Set(remainingIds);
+  const removedIndex = list.indexOf(removedUid);
 
-      const players =
-        room.players ?? {};
+  if (list.length === 0) return remainingIds[0] ?? null;
 
-      if (!players[uid]) {
-        return room;
-      }
+  for (let offset = 1; offset <= list.length; offset += 1) {
+    const index =
+      (Math.max(removedIndex, 0) + offset) % list.length;
+    const candidate = list[index];
+    if (remaining.has(candidate)) return candidate;
+  }
 
-      const leavingNickname =
-        players[uid]?.nickname ??
-        "플레이어";
-
-      delete players[uid];
-
-      const remainingIds =
-        Object.keys(players);
-
-      if (remainingIds.length === 0) {
-        return null;
-      }
-
-      room.players = players;
-      room.meta.updatedAt = Date.now();
-
-      removePlayerFromActiveGame(
-        room,
-        uid,
-        leavingNickname
-      );
-
-      if (
-        room.game?.phase === "SUBMIT"
-      ) {
-        const submittedIds =
-          Object.keys(
-            room.game.submissions ?? {}
-          );
-
-        if (
-          remainingIds.every(
-            (playerUid) =>
-              submittedIds.includes(playerUid)
-          )
-        ) {
-          evaluateSet(room);
-        }
-      }
-
-      if (room.meta?.hostUid === uid) {
-        const nextHostUid = remainingIds
-          .sort((uidA, uidB) => {
-            return (
-              Number(
-                players[uidA]?.joinedAt ?? 0
-              ) -
-              Number(
-                players[uidB]?.joinedAt ?? 0
-              )
-            );
-          })[0];
-
-        room.meta.hostUid =
-          nextHostUid;
-        room.meta.hostChangedAt =
-          Date.now();
-      }
-
-      return room;
-    }
-  );
+  return remainingIds[0] ?? null;
 }
 
+function skipDepartedPlayer(room, uid) {
+  const game = room.game;
+  if (!game) return;
+
+  const remainingIds = Object.keys(room.players ?? {});
+  const oldTurnOrder = Array.isArray(game.turnOrder)
+    ? [...game.turnOrder]
+    : [];
+  const oldFinalQueue = Array.isArray(game.finalTurnQueue)
+    ? [...game.finalTurnQueue]
+    : [];
+
+  game.turnOrder = oldTurnOrder.filter(
+    (playerUid) => remainingIds.includes(playerUid)
+  );
+  game.finalTurnQueue = oldFinalQueue.filter(
+    (playerUid) => remainingIds.includes(playerUid)
+  );
+
+  if (game.hands) delete game.hands[uid];
+  if (game.submissions) delete game.submissions[uid];
+  if (game.bellOwner === uid) game.bellOwner = null;
+
+  if (game.phase === "SUBMIT") {
+    const submittedIds = Object.keys(game.submissions ?? {});
+    if (
+      remainingIds.length > 0 &&
+      remainingIds.every((playerUid) =>
+        submittedIds.includes(playerUid)
+      )
+    ) {
+      evaluateSet(room);
+    }
+    return;
+  }
+
+  if (game.turnUid !== uid) {
+    if (game.turnOrder.includes(game.turnUid)) {
+      game.turnIndex = game.turnOrder.indexOf(game.turnUid);
+    }
+    if (game.finalTurnQueue.includes(game.turnUid)) {
+      game.finalTurnIndex = game.finalTurnQueue.indexOf(
+        game.turnUid
+      );
+    }
+    return;
+  }
+
+  const continuingFinalTurns =
+    game.phase === "FINAL_TURNS" ||
+    (
+      game.phase === "DISCARD" &&
+      game.previousPhase === "FINAL_TURNS"
+    );
+
+  game.drawSource = null;
+  game.previousPhase = null;
+
+  if (continuingFinalTurns) {
+    const removedIndex = Math.max(
+      0,
+      oldFinalQueue.indexOf(uid)
+    );
+    const nextUid = game.finalTurnQueue[removedIndex] ?? null;
+
+    if (nextUid) {
+      game.phase = "FINAL_TURNS";
+      game.finalTurnIndex = removedIndex;
+      game.turnUid = nextUid;
+      game.turnStartedAt = Date.now();
+      game.turnNumber = Number(game.turnNumber ?? 0) + 1;
+    } else {
+      prepareSubmitPhase(game);
+    }
+  } else {
+    const nextUid = nextRemainingPlayerUid(
+      oldTurnOrder,
+      uid,
+      remainingIds
+    );
+
+    if (nextUid) {
+      game.phase = "TURN_ACTION";
+      game.turnUid = nextUid;
+      game.turnIndex = game.turnOrder.indexOf(nextUid);
+      game.turnStartedAt = Date.now();
+      game.turnNumber = Number(game.turnNumber ?? 0) + 1;
+    } else {
+      game.turnUid = null;
+    }
+  }
+
+  game.lastAction = {
+    type: "PLAYER_LEFT_SKIP",
+    uid: null,
+    leftUid: uid,
+    automatic: true,
+    at: Date.now()
+  };
+}
+
+export async function leaveRoom(roomCode, uid) {
+  const roomRef = ref(db, `rooms/${roomCode}`);
+
+  await runTransaction(roomRef, (room) => {
+    if (!room) return null;
+
+    const players = room.players ?? {};
+
+    if (!players[uid]) return room;
+
+    delete players[uid];
+
+    const remainingIds = Object.keys(players);
+
+    if (remainingIds.length === 0) {
+      return null;
+    }
+
+    room.players = players;
+    room.meta.updatedAt = Date.now();
+    skipDepartedPlayer(room, uid);
+
+    if (room.meta?.hostUid === uid) {
+      const nextHostUid = remainingIds
+        .sort((uidA, uidB) => {
+          return Number(players[uidA]?.joinedAt ?? 0) -
+            Number(players[uidB]?.joinedAt ?? 0);
+        })[0];
+
+      room.meta.hostUid = nextHostUid;
+      room.meta.hostChangedAt = Date.now();
+
+      room.game = room.game ?? {};
+      room.game.lastAction = {
+        type: "HOST_CHANGED",
+        uid: nextHostUid,
+        automatic: true,
+        at: Date.now()
+      };
+    }
+
+    return room;
+  });
+}

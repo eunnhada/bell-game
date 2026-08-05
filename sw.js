@@ -1,4 +1,4 @@
-const CACHE_NAME = "bell-game-v29-stable-addons";
+const CACHE_NAME = "bell-game-v26-result-sound-fix";
 const APP_SHELL = [
   "./",
   "./index.html",
