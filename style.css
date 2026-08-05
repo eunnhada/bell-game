@@ -6676,3 +6676,111 @@ body.game-active #gameScreen {
     max-height: 78px !important;
   }
 }
+
+
+/* =========================================================
+   BELL v25 기능 팩
+   ========================================================= */
+
+.round-setting {
+  margin-top: 12px;
+}
+
+.round-setting > strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.round-option-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.round-option-button {
+  min-height: 44px;
+  border: 1px solid #465a73;
+  border-radius: 12px;
+  color: #dce7f5;
+  background: #102039;
+  font-weight: 900;
+}
+
+.round-option-button.active {
+  border-color: var(--gold);
+  color: #07111e;
+  background: var(--gold);
+}
+
+.round-option-button:disabled {
+  opacity: 0.58;
+}
+
+.hand-cards {
+  gap: 12px !important;
+  padding-inline: 8px !important;
+}
+
+.hand-card {
+  touch-action: manipulation;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+}
+
+.hand-card:hover,
+.hand-card:focus-visible {
+  z-index: 4;
+}
+
+.hand-card.selected,
+.hand-card.discard-selected {
+  z-index: 6;
+}
+
+.card-transfer-ghost {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  border: 3px solid rgba(255,255,255,.7);
+  border-radius: 12px;
+  background:
+    linear-gradient(145deg, #27486f, #091525);
+  box-shadow: 0 16px 40px rgba(0,0,0,.55);
+  transition:
+    transform .48s cubic-bezier(.2,.8,.2,1),
+    opacity .48s ease;
+}
+
+.mini-card {
+  min-width: 66px !important;
+  padding: 5px 7px !important;
+  border-radius: 8px;
+  color: white;
+  font-size: 10px !important;
+  font-weight: 900;
+  text-align: center;
+}
+
+.mini-card.yellow {
+  color: #18130a;
+}
+
+.side-panel-tabs {
+  grid-template-columns: 1fr 1fr auto auto auto !important;
+}
+
+@media (max-width: 760px) {
+  .hand-cards {
+    gap: 8px !important;
+  }
+
+  .mini-card {
+    min-width: 54px !important;
+    font-size: 8px !important;
+  }
+}
+
+.version-badge { display: none !important; }
+#homeScreen:not(.hidden) ~ * .version-badge { display: none !important; }
+body:not(.game-active) .version-badge { display: inline-flex !important; }

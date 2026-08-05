@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <div id="versionBadge" class="version-badge">v22</div>
+  <div id="versionBadge" class="version-badge">v25</div>
   <main id="app" class="app">
     <section id="homeScreen" class="screen home-screen">
       <div class="brand">
@@ -80,6 +80,14 @@
           <button class="mode-button active" data-mode="SOLO" type="button">개인전</button>
           <button class="mode-button" data-mode="TEAM_2V2" type="button">2 VS 2</button>
           <button class="mode-button" data-mode="TEAM_3V3" type="button">3 VS 3</button>
+        </div>
+
+        <div class="round-setting">
+          <strong>전체 라운드</strong>
+          <div class="round-option-grid">
+            <button class="round-option-button" data-rounds="3" type="button">3라운드</button>
+            <button class="round-option-button active" data-rounds="5" type="button">5라운드</button>
+          </div>
         </div>
 
         <div class="lobby-control-grid">
@@ -156,6 +164,9 @@
             </button>
             <button id="toggleSoundButton" class="icon-button" type="button" aria-label="효과음 켜기 또는 끄기">
               🔊
+            </button>
+            <button id="toggleBgmButton" class="icon-button" type="button" aria-label="배경음악 켜기 또는 끄기">
+              🎵
             </button>
           </div>
 

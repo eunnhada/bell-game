@@ -8,6 +8,7 @@ import {
   shuffleTeams,
   kickPlayer,
   startGame,
+  changeMaxRounds,
   takeOpenCard,
   drawDeckCard,
   discardCard,
@@ -98,6 +99,7 @@ const chatInput = document.querySelector("#chatInput");
 const sendChatButton = document.querySelector("#sendChatButton");
 const quickChatButtons = [...document.querySelectorAll(".quick-chat-button")];
 const toggleSoundButton = document.querySelector("#toggleSoundButton");
+const toggleBgmButton = document.querySelector("#toggleBgmButton");
 const collapseSidePanelButton = document.querySelector("#collapseSidePanelButton");
 const cardPreviewModal = document.querySelector("#cardPreviewModal");
 const cardPreviewContent = document.querySelector("#cardPreviewContent");
@@ -147,6 +149,9 @@ let lastRoundAdvanceKey = "";
 let unsubscribeConnection = null;
 let unsubscribeChat = null;
 let soundEnabled = localStorage.getItem("bellSoundEnabled") !== "false";
+let bgmEnabled = localStorage.getItem("bellBgmEnabled") !== "false";
+let bgmTimer = null;
+let bgmStep = 0;
 let previousGameSnapshot = null;
 let previousHandSize = 0;
 let previousOpenCardId = "";
@@ -546,7 +551,8 @@ function playTone(type) {
 
     const settings = {
       bell: { frequency: 880, duration: 0.45 },
-      draw: { frequency: 420, duration: 0.12 },
+      draw: { frequency: 360, duration: 0.16 },
+      take: { frequency: 510, duration: 0.14 },
       discard: { frequency: 270, duration: 0.15 },
       turn: { frequency: 660, duration: 0.18 },
       lose: { frequency: 160, duration: 0.4 },
@@ -588,6 +594,85 @@ function addLog(text) {
   gameLogList.scrollTop = gameLogList.scrollHeight;
 }
 
+
+function playBgmNote() {
+  if (!bgmEnabled || screens.game.classList.contains("hidden")) return;
+
+  try {
+    const AudioContextClass =
+      window.AudioContext || window.webkitAudioContext;
+    const context = getAudioContext?.() ?? new AudioContextClass();
+    const notes = [196, 220, 247, 220, 174, 196, 220, 247];
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.value = notes[bgmStep % notes.length];
+    gain.gain.setValueAtTime(0.0001, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.025, context.currentTime + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.55);
+
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.58);
+    bgmStep += 1;
+  } catch (error) {
+    console.debug("BGM unavailable", error);
+  }
+}
+
+function startBgm() {
+  stopBgm();
+  if (!bgmEnabled) return;
+  playBgmNote();
+  bgmTimer = window.setInterval(playBgmNote, 650);
+}
+
+function stopBgm() {
+  if (bgmTimer) {
+    clearInterval(bgmTimer);
+    bgmTimer = null;
+  }
+}
+
+function animateCardToPlayer(sourceElement, targetUid) {
+  if (
+    accessibilitySettings.reducedMotion ||
+    !sourceElement ||
+    !currentRoom
+  ) return;
+
+  const target =
+    targetUid === currentUser?.uid
+      ? myLifeDisplay
+      : document.querySelector(
+          `.opponent-card[data-turn-uid="${targetUid}"]`
+        );
+
+  if (!target) return;
+
+  const sourceRect = sourceElement.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const ghost = document.createElement("div");
+  ghost.className = "card-transfer-ghost";
+  ghost.style.left = `${sourceRect.left}px`;
+  ghost.style.top = `${sourceRect.top}px`;
+  ghost.style.width = `${sourceRect.width}px`;
+  ghost.style.height = `${sourceRect.height}px`;
+  document.body.append(ghost);
+
+  requestAnimationFrame(() => {
+    ghost.style.transform = `translate(
+      ${targetRect.left + targetRect.width / 2 - sourceRect.left - sourceRect.width / 2}px,
+      ${targetRect.top + targetRect.height / 2 - sourceRect.top - sourceRect.height / 2}px
+    ) scale(0.28)`;
+    ghost.style.opacity = "0";
+  });
+
+  setTimeout(() => ghost.remove(), 520);
+}
+
 function actionToLog(room) {
   const action = room.game?.lastAction;
   if (!action) return "";
@@ -606,7 +691,8 @@ function actionToLog(room) {
     AUTO_BELL_DECK_EMPTY: "더미가 소진되어 자동 벨이 울렸습니다.",
     NEXT_SET: "다음 세트가 시작됐습니다.",
     NEXT_ROUND: "다음 라운드가 시작됐습니다.",
-    HOST_CHANGED: `${name}님이 새 방장이 됐습니다.`
+    HOST_CHANGED: `${name}님이 새 방장이 됐습니다.`,
+    PLAYER_LEFT_SKIP: "나간 플레이어의 턴을 건너뛰었습니다."
   };
 
   return messages[action.type] ?? "";
@@ -647,6 +733,12 @@ function handleGameEffects(room) {
 
     if (actionType === "DRAW_DECK" || actionType === "AUTO_DRAW_DECK") {
       playTone("draw");
+      animateCardToPlayer(deckButton, currentGame.lastAction?.uid);
+    }
+
+    if (actionType === "TAKE_OPEN" || actionType === "AUTO_DRAW_OPEN") {
+      playTone("take");
+      animateCardToPlayer(openCardButton, currentGame.lastAction?.uid);
     }
 
     if (actionType === "DISCARD" || actionType === "AUTO_DISCARD") {
@@ -746,8 +838,10 @@ function showScreen(name) {
   if (name === "game") {
     requestWakeLock();
     scheduleViewportRefresh();
+    startBgm();
   } else {
     releaseWakeLock();
+    stopBgm();
   }
 }
 
@@ -808,6 +902,8 @@ function friendlyError(error) {
     return "인원을 확인해주세요. 2대2는 4명, 3대3은 6명이 필요합니다.";
   }
   if (message === "INVALID_ACTION") return "현재 실행할 수 없는 행동입니다.";
+  if (message === "INVALID_ROUND_COUNT") return "라운드는 3 또는 5만 선택할 수 있습니다.";
+  if (message === "ROUND_SETTING_FAILED") return "라운드 설정을 변경하지 못했습니다.";
   if (message === "RETURN_TO_LOBBY_FAILED") return "대기실로 돌아가지 못했습니다.";
 
   return message || "알 수 없는 오류가 발생했습니다.";
@@ -1255,7 +1351,16 @@ function renderResult(room) {
     for (const card of hand.filter((item) => selectedIds.includes(item.id))) {
       const mini = document.createElement("span");
       mini.className = `mini-card ${card.color}`;
-      mini.textContent = card.number;
+
+      const colorNames = {
+        red: "빨강",
+        yellow: "노랑",
+        green: "초록",
+        blue: "파랑"
+      };
+
+      mini.textContent = `${colorNames[card.color] ?? card.color} ${card.number}`;
+      mini.title = `${colorNames[card.color] ?? card.color} ${card.number}`;
       cards.append(mini);
     }
 
@@ -1363,9 +1468,12 @@ function renderRoundResult(room) {
     if ((!isTeamMode && survivors.includes(uid)) || teamWon) {
       const badge = document.createElement("span");
       badge.className = "round-badge";
+      const earnedPoints =
+        Number(game.roundPointAwards?.[uid] ?? 0);
+
       badge.textContent = isTeamMode
-        ? `${player.team}팀 승리 +1`
-        : "라운드 승리 +1";
+        ? `${player.team}팀 +${earnedPoints}점`
+        : `라운드 +${earnedPoints}점`;
       name.append(badge);
     }
 
@@ -1378,10 +1486,7 @@ function renderRoundResult(room) {
 
     const wins = document.createElement("div");
     wins.className = "score-number";
-    wins.textContent =
-      room.meta?.mode === "SOLO"
-        ? `${player.roundWins ?? 0}승`
-        : `${player.teamRoundWins ?? 0}승`;
+    wins.textContent = `${player.roundPoints ?? 0}점`;
 
     row.append(name, life, wins);
     roundScoreBoard.append(row);
@@ -1396,7 +1501,7 @@ function renderRoundResult(room) {
 
   roundResultMessage.textContent =
     `${eliminatedNames.join(", ")} 탈락 · 잠시 후 ${
-      Number(room.meta?.round ?? 1) >= 5
+      Number(room.meta?.round ?? 1) >= Number(room.meta?.maxRounds ?? 5)
         ? "최종 결과"
         : "다음 라운드"
     }로 이동합니다.`;
@@ -1476,7 +1581,7 @@ function renderFinalResult(room) {
 
     const stats = document.createElement("div");
     stats.className = "score-number";
-    stats.textContent = `${player.roundWins ?? 0}승`;
+    stats.textContent = `${player.roundPoints ?? 0}점`;
 
     const detail = document.createElement("div");
     detail.className = "player-meta";
@@ -1559,7 +1664,8 @@ function renderGame(room) {
     isMyTurn &&
     ["TURN_ACTION", "FINAL_TURNS"].includes(game.phase);
 
-  roundLabel.textContent = `라운드 ${room.meta?.round ?? 1} / 5`;
+  roundLabel.textContent =
+    `라운드 ${room.meta?.round ?? 1} / ${room.meta?.maxRounds ?? 5}`;
   setLabel.textContent = `세트 ${room.meta?.set ?? 1}`;
 
   gameBoard.classList.toggle("is-my-turn", isMyTurn);
@@ -2293,6 +2399,19 @@ toggleSoundButton.addEventListener("click", () => {
   }
 });
 
+toggleBgmButton.addEventListener("click", () => {
+  bgmEnabled = !bgmEnabled;
+  localStorage.setItem("bellBgmEnabled", String(bgmEnabled));
+  toggleBgmButton.textContent = bgmEnabled ? "🎵" : "🚫";
+
+  if (bgmEnabled) {
+    startBgm();
+  } else {
+    stopBgm();
+  }
+});
+
+
 createRoomButton.addEventListener("click", async () => {
   const nickname = getNickname();
 
@@ -2492,6 +2611,21 @@ modeButtons.forEach((button) => {
   });
 });
 
+
+roundOptionButtons.forEach((button) => {
+  button.addEventListener("click", async () => {
+    try {
+      await changeMaxRounds(
+        currentRoomCode,
+        currentUser.uid,
+        Number(button.dataset.rounds)
+      );
+    } catch (error) {
+      showMessage(lobbyMessage, friendlyError(error), "error");
+    }
+  });
+});
+
 startGameButton.addEventListener("click", async () => {
   try {
     await startGame(currentRoomCode, currentUser.uid);
@@ -2531,7 +2665,7 @@ confirmDiscardButton.addEventListener("click", async () => {
 
 
 submitCombinationButton.addEventListener("click", async () => {
-  if (selectedSubmitCardIds.size < 2) return;
+  if (selectedSubmitCardIds.size < 1) return;
 
   try {
     await submitCombination(
@@ -2635,6 +2769,12 @@ returnHomeButton.addEventListener("click", async () => {
 });
 
 async function handleLeave() {
+  const shouldLeave = window.confirm(
+    "정말 방에서 나가시겠습니까?"
+  );
+
+  if (!shouldLeave) return;
+
   if (currentRoomCode && currentUser) {
     try {
       await leaveRoom(currentRoomCode, currentUser.uid);
@@ -2684,6 +2824,8 @@ if (savedNickname) nicknameInput.value = savedNickname;
 
 toggleSoundButton.textContent =
   soundEnabled ? "🔊" : "🔇";
+toggleBgmButton.textContent =
+  bgmEnabled ? "🎵" : "🚫";
 
 
 

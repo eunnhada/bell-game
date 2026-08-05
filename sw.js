@@ -1,4 +1,4 @@
-const CACHE_NAME = "bell-game-v24-center-card-alignment";
+const CACHE_NAME = "bell-game-v25-feature-pack";
 const APP_SHELL = [
   "./",
   "./index.html",
