@@ -6829,3 +6829,79 @@ body:not(.game-active) .version-badge {
 .hand-cards {
   gap: 14px !important;
 }
+
+
+/* =========================================================
+   v27 — 카드 획득/버리기 단계 가시성
+   ========================================================= */
+
+.hand-card.newly-received-card {
+  z-index: 12 !important;
+  border-color: #ffe071 !important;
+  box-shadow:
+    0 0 0 3px rgba(255, 224, 113, 0.48),
+    0 0 28px rgba(255, 209, 65, 0.78) !important;
+  animation: newlyReceivedPulse 0.9s ease-in-out infinite alternate;
+}
+
+.hand-card.newly-received-card::after {
+  content: "NEW";
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 34px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  color: #101010;
+  background: #ffd75a;
+  font-size: 9px;
+  font-weight: 1000;
+  line-height: 1;
+  letter-spacing: 0.4px;
+  pointer-events: none;
+}
+
+@keyframes newlyReceivedPulse {
+  from {
+    transform: translateY(-2px) scale(1);
+  }
+  to {
+    transform: translateY(-5px) scale(1.035);
+  }
+}
+
+/* 5장 상태에서도 모두 보이고 클릭되도록 */
+.hand-cards {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  justify-content: center !important;
+  gap: 12px !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  padding:
+    17px
+    12px
+    12px !important;
+  scroll-padding-inline: 12px;
+}
+
+.hand-card {
+  flex-shrink: 0 !important;
+}
+
+@media (max-width: 760px) {
+  .hand-cards {
+    justify-content: flex-start !important;
+    gap: 8px !important;
+    padding:
+      17px
+      9px
+      10px !important;
+  }
+
+  .hand-card.newly-received-card::after {
+    top: -10px;
+    font-size: 8px;
+  }
+}

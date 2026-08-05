@@ -164,6 +164,7 @@ let lastDangerSecond = null;
 let previousMyLife = null;
 let lastTurnAnnouncementKey = "";
 let actionRequestPending = false;
+let newlyReceivedCardId = null;
 let sidePanelExpanded = false;
 let cardPreviewTimer = null;
 let deferredInstallPrompt = null;
@@ -1929,7 +1930,28 @@ function renderGame(room) {
   bellButton.disabled =
     !(isMyTurn && game.phase === "TURN_ACTION" && !game.bellOwner);
 
-  selectedDiscardCardId = isDiscardPhase ? selectedDiscardCardId : null;
+  selectedDiscardCardId =
+    isDiscardPhase ? selectedDiscardCardId : null;
+
+  const previousMyHand =
+    previousGameSnapshot?.hands?.[myUid] ?? [];
+
+  const previousCardIds = new Set(
+    previousMyHand.map((card) => card.id)
+  );
+
+  const addedCard = myHand.find(
+    (card) => !previousCardIds.has(card.id)
+  );
+
+  if (isDiscardPhase && addedCard) {
+    newlyReceivedCardId = addedCard.id;
+  }
+
+  if (!isDiscardPhase) {
+    newlyReceivedCardId = null;
+  }
+
   const handGrew = myHand.length > previousHandSize;
   handCards.innerHTML = "";
 
@@ -1970,6 +1992,17 @@ function renderGame(room) {
 
     if (handGrew && cardIndex === myHand.length - 1) {
       button.classList.add("card-enter");
+    }
+
+    if (
+      isDiscardPhase &&
+      newlyReceivedCardId === card.id
+    ) {
+      button.classList.add("newly-received-card");
+      button.setAttribute(
+        "aria-label",
+        `새로 받은 카드 ${card.number}`
+      );
     }
 
     bindCardLongPress(button, card);
@@ -2021,7 +2054,10 @@ function renderGame(room) {
   } else if (game.phase === "ROUND_END") {
     showMessage(gameMessage, "플레이어가 탈락해 라운드가 종료됐습니다.");
   } else if (game.phase === "GAME_END") {
-    showMessage(gameMessage, "총 5라운드가 모두 끝났습니다.");
+    showMessage(
+      gameMessage,
+      `총 ${room.meta?.maxRounds ?? 5}라운드가 모두 끝났습니다.`
+    );
   } else if (automaticMessage) {
     showMessage(gameMessage, automaticMessage);
   } else if (game.lastAction?.type === "BELL") {
@@ -2037,7 +2073,13 @@ function renderGame(room) {
         : "벨, 오픈 카드, 더미 중 하나를 선택하세요."
     );
   } else if (isDiscardPhase) {
-    showMessage(gameMessage, "방금 뽑은 카드를 포함해 한 장을 버리세요.");
+    showMessage(
+      gameMessage,
+      `카드가 손패에 들어왔습니다. 현재 ${
+        myHand.length
+      }장입니다. 25초 안에 버릴 카드 1장을 선택하세요.`,
+      "success"
+    );
   } else {
     showMessage(gameMessage, "다른 플레이어의 행동을 기다리는 중입니다.");
   }
@@ -2049,11 +2091,13 @@ function startTimer(game) {
   if (timerInterval) clearInterval(timerInterval);
 
   const requestKey =
-    `${game.turnUid}:${game.phase}:${game.turnNumber}`;
+    `${game.turnUid}:${game.phase}:${game.turnNumber}:${
+      game.turnStartedAt ?? ""
+    }`;
 
   const updateTimer = async () => {
     let startedAt = Number(game.turnStartedAt ?? Date.now());
-    let duration = 15;
+    let duration = game.phase === "DISCARD" ? 25 : 15;
 
     if (game.phase === "SUBMIT") {
       startedAt = Number(game.submitStartedAt ?? Date.now());
@@ -2830,6 +2874,12 @@ openCardButton.addEventListener("click", async () => {
       currentRoomCode,
       currentUser.uid
     );
+
+    showMessage(
+      gameMessage,
+      "오픈 카드가 손패에 들어왔습니다. 이제 버릴 카드 1장을 선택하세요.",
+      "success"
+    );
   } catch (error) {
     showMessage(
       gameMessage,
@@ -2838,6 +2888,7 @@ openCardButton.addEventListener("click", async () => {
     );
   } finally {
     actionRequestPending = false;
+  newlyReceivedCardId = null;
   }
 });
 
@@ -2855,6 +2906,12 @@ deckButton.addEventListener("click", async () => {
       currentRoomCode,
       currentUser.uid
     );
+
+    showMessage(
+      gameMessage,
+      "더미 카드가 손패에 들어왔습니다. 이제 버릴 카드 1장을 선택하세요.",
+      "success"
+    );
   } catch (error) {
     showMessage(
       gameMessage,
@@ -2870,8 +2927,14 @@ confirmDiscardButton.addEventListener("click", async () => {
   if (!selectedDiscardCardId) return;
 
   try {
-    await discardCard(currentRoomCode, currentUser.uid, selectedDiscardCardId);
+    await discardCard(
+      currentRoomCode,
+      currentUser.uid,
+      selectedDiscardCardId
+    );
+
     selectedDiscardCardId = null;
+    newlyReceivedCardId = null;
   } catch (error) {
     showMessage(gameMessage, friendlyError(error));
   }
