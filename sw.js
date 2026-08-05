@@ -1,4 +1,4 @@
-const CACHE_NAME = "bell-game-v27-discard-visibility";
+const CACHE_NAME = "bell-game-v29-stable-addons";
 const APP_SHELL = [
   "./",
   "./index.html",

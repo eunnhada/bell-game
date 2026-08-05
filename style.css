@@ -6679,7 +6679,7 @@ body.game-active #gameScreen {
 
 
 /* =========================================================
-   v25-fixed 안정화 기능
+   v29 안정 기능
    ========================================================= */
 
 .round-setting {
@@ -6714,194 +6714,102 @@ body.game-active #gameScreen {
 }
 
 .round-option-button:disabled {
-  opacity: 0.55;
   cursor: not-allowed;
+  opacity: 0.56;
 }
 
-.hand-cards {
-  gap: 12px !important;
-  padding-inline: 10px !important;
-}
-
-.hand-card {
-  touch-action: manipulation;
-  cursor: pointer;
-}
-
-.mini-card {
-  min-width: 68px !important;
-  padding: 5px 7px !important;
-  font-size: 10px !important;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.side-panel-tabs {
-  grid-template-columns: 1fr 1fr auto auto auto !important;
-}
-
-.version-badge {
-  display: none !important;
-}
-
-#homeScreen:not(.hidden) .version-badge,
-body:not(.game-active) .version-badge {
-  display: inline-flex !important;
-}
-
-@media (max-width: 760px) {
-  .hand-cards {
-    gap: 8px !important;
-  }
-
-  .mini-card {
-    min-width: 56px !important;
-    font-size: 8px !important;
-  }
-}
-
-
-/* v25-audited: 카드 선택성과 이동 연출 */
+/* 제출·버리기 클릭이 겹치지 않도록 카드 사이를 벌림 */
 .hand-cards {
   gap: 14px !important;
   padding-inline: 12px !important;
 }
 
 .hand-card {
+  flex-shrink: 0 !important;
+  position: relative !important;
   touch-action: manipulation !important;
   -webkit-tap-highlight-color: transparent;
 }
 
+.hand-card:hover,
+.hand-card:focus-visible {
+  z-index: 5;
+}
+
+.hand-card.selected,
+.hand-card.submit-selected {
+  z-index: 8;
+}
+
+/* 카드 획득 이동 연출 */
 .card-transfer-ghost {
   position: fixed;
   z-index: 10000;
   display: grid;
   place-items: center;
   pointer-events: none;
-  border: 3px solid rgba(255, 255, 255, 0.72);
+  border: 3px solid rgba(255, 255, 255, 0.74);
   border-radius: 12px;
   color: white;
-  background: #233a57;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.58);
-  font-size: clamp(24px, 7vw, 46px);
+  background: #264768;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.58);
+  font-size: clamp(24px, 6vw, 44px);
   font-weight: 1000;
   transition:
-    transform 0.5s cubic-bezier(.2,.8,.2,1),
+    transform 0.5s cubic-bezier(.2, .8, .2, 1),
     opacity 0.5s ease;
   will-change: transform, opacity;
 }
 
 .card-transfer-ghost.red {
-  background: #ca3c46;
+  background: #cf404b;
 }
 
 .card-transfer-ghost.yellow {
-  color: #1a1408;
-  background: #e2b626;
+  color: #171106;
+  background: #e7b930;
 }
 
 .card-transfer-ghost.green {
-  background: #278a57;
+  background: #2d955f;
 }
 
 .card-transfer-ghost.blue {
-  background: #3270d2;
+  background: #3475d7;
+}
+
+/* 결과 카드에서 색상명+숫자를 함께 읽을 수 있게 함 */
+.mini-card {
+  min-width: 66px !important;
+  padding: 5px 7px !important;
+  text-align: center;
+  white-space: nowrap;
+  font-size: 10px !important;
+  font-weight: 900;
+}
+
+.mini-card.yellow {
+  color: #171106;
+}
+
+/* 로그/채팅/효과음/BGM */
+.side-panel-tabs {
+  grid-template-columns:
+    1fr
+    1fr
+    auto
+    auto
+    auto !important;
 }
 
 @media (max-width: 760px) {
   .hand-cards {
-    gap: 10px !important;
+    gap: 9px !important;
     padding-inline: 8px !important;
   }
-}
 
-
-/* v26 stable actions */
-.table-zone button.action-pending,
-.table-zone button:disabled {
-  touch-action: manipulation;
-}
-
-.table-zone button:not(:disabled):active {
-  transform: scale(0.98);
-}
-
-.hand-cards {
-  gap: 14px !important;
-}
-
-
-/* =========================================================
-   v27 — 카드 획득/버리기 단계 가시성
-   ========================================================= */
-
-.hand-card.newly-received-card {
-  z-index: 12 !important;
-  border-color: #ffe071 !important;
-  box-shadow:
-    0 0 0 3px rgba(255, 224, 113, 0.48),
-    0 0 28px rgba(255, 209, 65, 0.78) !important;
-  animation: newlyReceivedPulse 0.9s ease-in-out infinite alternate;
-}
-
-.hand-card.newly-received-card::after {
-  content: "NEW";
-  position: absolute;
-  top: -11px;
-  left: 50%;
-  transform: translateX(-50%);
-  min-width: 34px;
-  padding: 3px 6px;
-  border-radius: 999px;
-  color: #101010;
-  background: #ffd75a;
-  font-size: 9px;
-  font-weight: 1000;
-  line-height: 1;
-  letter-spacing: 0.4px;
-  pointer-events: none;
-}
-
-@keyframes newlyReceivedPulse {
-  from {
-    transform: translateY(-2px) scale(1);
-  }
-  to {
-    transform: translateY(-5px) scale(1.035);
-  }
-}
-
-/* 5장 상태에서도 모두 보이고 클릭되도록 */
-.hand-cards {
-  display: flex !important;
-  flex-wrap: nowrap !important;
-  justify-content: center !important;
-  gap: 12px !important;
-  overflow-x: auto !important;
-  overflow-y: visible !important;
-  padding:
-    17px
-    12px
-    12px !important;
-  scroll-padding-inline: 12px;
-}
-
-.hand-card {
-  flex-shrink: 0 !important;
-}
-
-@media (max-width: 760px) {
-  .hand-cards {
-    justify-content: flex-start !important;
-    gap: 8px !important;
-    padding:
-      17px
-      9px
-      10px !important;
-  }
-
-  .hand-card.newly-received-card::after {
-    top: -10px;
-    font-size: 8px;
+  .mini-card {
+    min-width: 54px !important;
+    font-size: 8px !important;
   }
 }

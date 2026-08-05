@@ -577,10 +577,17 @@ function evaluateSet(room) {
 
   if (bellFailed) {
     // 잘못 벨을 누른 사람만 라이프 2개 감소.
-    lifeLosses[bellOwner] = 2;
+    // 다른 최고점·최저점 플레이어는 라이프를 잃지 않는다.
+    lifeLosses[bellOwner] = Math.max(
+      lifeLosses[bellOwner] ?? 0,
+      2
+    );
   } else {
     for (const uid of lowestUids) {
-      lifeLosses[uid] = Math.max(lifeLosses[uid] ?? 0, 1);
+      lifeLosses[uid] = Math.max(
+        lifeLosses[uid] ?? 0,
+        1
+      );
     }
   }
 
@@ -612,33 +619,211 @@ function evaluateSet(room) {
 }
 
 
-function awardRoundPoints(room) {
-  const players = room.players ?? {};
-  const ids = Object.keys(players);
+function pointsByDistinctScore(scoreValues) {
+  const uniqueScores = [
+    ...new Set(
+      scoreValues.map((value) => Number(value ?? 0))
+    )
+  ].sort((scoreA, scoreB) => scoreB - scoreA);
 
-  const ranking = [...ids].sort((uidA, uidB) => {
-    const lifeDiff =
-      Number(players[uidB]?.life ?? 0) -
-      Number(players[uidA]?.life ?? 0);
+  const points = {};
 
-    if (lifeDiff !== 0) return lifeDiff;
-
-    return Number(players[uidA]?.joinedAt ?? 0) -
-      Number(players[uidB]?.joinedAt ?? 0);
+  uniqueScores.forEach((score, index) => {
+    points[score] =
+      index === 0
+        ? 2
+        : index === 1
+          ? 1
+          : 0;
   });
 
+  return points;
+}
+
+function awardRoundPoints(room) {
+  const players = room.players ?? {};
+  const playerIds = Object.keys(players);
+  const teamMode = isTeamMode(room.meta?.mode);
   const awards = {};
 
-  if (ranking[0]) awards[ranking[0]] = 2;
-  if (ranking[1]) awards[ranking[1]] = 1;
+  if (teamMode) {
+    const teamLife = {};
 
-  for (const uid of ids) {
-    players[uid].roundPoints =
-      Number(players[uid].roundPoints ?? 0) +
-      Number(awards[uid] ?? 0);
+    for (const uid of playerIds) {
+      const team = players[uid]?.team;
+      if (!team) continue;
+
+      teamLife[team] =
+        Number(teamLife[team] ?? 0) +
+        Number(players[uid]?.life ?? 0);
+    }
+
+    const pointMap = pointsByDistinctScore(
+      Object.values(teamLife)
+    );
+
+    for (const uid of playerIds) {
+      const team = players[uid]?.team;
+      const earned = Number(
+        pointMap[Number(teamLife[team] ?? 0)] ?? 0
+      );
+
+      players[uid].roundPoints =
+        Number(players[uid].roundPoints ?? 0) +
+        earned;
+
+      awards[uid] = earned;
+    }
+
+    room.game.roundTeamLife = teamLife;
+  } else {
+    const pointMap = pointsByDistinctScore(
+      playerIds.map(
+        (uid) => Number(players[uid]?.life ?? 0)
+      )
+    );
+
+    for (const uid of playerIds) {
+      const life = Number(players[uid]?.life ?? 0);
+      const earned = Number(pointMap[life] ?? 0);
+
+      players[uid].roundPoints =
+        Number(players[uid].roundPoints ?? 0) +
+        earned;
+
+      awards[uid] = earned;
+    }
   }
 
   room.game.roundPointAwards = awards;
+}
+
+function removePlayerFromActiveGame(
+  room,
+  uid,
+  nickname
+) {
+  const game = room.game;
+
+  if (!game) return;
+
+  const wasCurrentTurn =
+    game.turnUid === uid;
+
+  const originalTurnOrder = Array.isArray(
+    game.turnOrder
+  )
+    ? [...game.turnOrder]
+    : [];
+
+  const originalTurnIndex = Math.max(
+    0,
+    originalTurnOrder.indexOf(uid)
+  );
+
+  game.turnOrder = originalTurnOrder.filter(
+    (playerUid) => playerUid !== uid
+  );
+
+  if (game.hands) {
+    delete game.hands[uid];
+  }
+
+  if (game.submissions) {
+    delete game.submissions[uid];
+  }
+
+  if (Array.isArray(game.finalTurnQueue)) {
+    const originalQueue = [...game.finalTurnQueue];
+    const originalQueueIndex = Math.max(
+      0,
+      originalQueue.indexOf(uid)
+    );
+
+    game.finalTurnQueue = originalQueue.filter(
+      (playerUid) => playerUid !== uid
+    );
+
+    if (
+      wasCurrentTurn &&
+      game.phase === "FINAL_TURNS"
+    ) {
+      if (game.finalTurnQueue.length === 0) {
+        prepareSubmitPhase(game);
+      } else if (
+        originalQueueIndex <
+        game.finalTurnQueue.length
+      ) {
+        game.finalTurnIndex =
+          originalQueueIndex;
+        game.turnUid =
+          game.finalTurnQueue[originalQueueIndex];
+        game.turnStartedAt = Date.now();
+        game.turnNumber =
+          Number(game.turnNumber ?? 0) + 1;
+      } else {
+        prepareSubmitPhase(game);
+      }
+    } else if (
+      game.phase === "FINAL_TURNS" &&
+      game.turnUid
+    ) {
+      game.finalTurnIndex = Math.max(
+        0,
+        game.finalTurnQueue.indexOf(
+          game.turnUid
+        )
+      );
+    }
+  }
+
+  if (
+    wasCurrentTurn &&
+    ["TURN_ACTION", "DISCARD"].includes(
+      game.phase
+    )
+  ) {
+    game.previousPhase = null;
+    game.drawSource = null;
+
+    if (game.turnOrder.length > 0) {
+      const nextIndex =
+        originalTurnIndex <
+        game.turnOrder.length
+          ? originalTurnIndex
+          : 0;
+
+      game.phase = "TURN_ACTION";
+      game.turnIndex = nextIndex;
+      game.turnUid =
+        game.turnOrder[nextIndex];
+      game.turnStartedAt = Date.now();
+      game.turnNumber =
+        Number(game.turnNumber ?? 0) + 1;
+    } else {
+      game.turnUid = null;
+    }
+  } else if (
+    game.turnUid &&
+    Array.isArray(game.turnOrder)
+  ) {
+    game.turnIndex = Math.max(
+      0,
+      game.turnOrder.indexOf(
+        game.turnUid
+      )
+    );
+  }
+
+  game.lastAction = {
+    type: wasCurrentTurn
+      ? "PLAYER_LEFT_SKIP"
+      : "PLAYER_LEFT",
+    uid: null,
+    nickname,
+    automatic: true,
+    at: Date.now()
+  };
 }
 
 function beginNextSet(room) {
@@ -965,7 +1150,11 @@ export async function kickPlayer(
 }
 
 
-export async function changeMaxRounds(roomCode, uid, maxRounds) {
+export async function changeMaxRounds(
+  roomCode,
+  uid,
+  maxRounds
+) {
   const value = Number(maxRounds);
 
   if (![3, 5].includes(value)) {
@@ -974,16 +1163,19 @@ export async function changeMaxRounds(roomCode, uid, maxRounds) {
 
   const roomRef = ref(db, `rooms/${roomCode}`);
 
-  const result = await runTransaction(roomRef, (room) => {
-    if (!room) return;
-    if (room.meta?.hostUid !== uid) return;
-    if (room.meta?.status !== "WAITING") return;
+  const result = await runTransaction(
+    roomRef,
+    (room) => {
+      if (!room) return;
+      if (room.meta?.hostUid !== uid) return;
+      if (room.meta?.status !== "WAITING") return;
 
-    room.meta.maxRounds = value;
-    room.meta.updatedAt = Date.now();
+      room.meta.maxRounds = value;
+      room.meta.updatedAt = Date.now();
 
-    return room;
-  });
+      return room;
+    }
+  );
 
   if (!result.committed) {
     throw new Error("ROUND_SETTING_FAILED");
@@ -1103,7 +1295,6 @@ export async function takeOpenCard(roomCode, uid) {
   if (!result.committed) throw new Error("INVALID_ACTION");
 }
 
-
 export async function drawDeckCard(roomCode, uid) {
   const roomRef = ref(db, `rooms/${roomCode}`);
 
@@ -1162,7 +1353,6 @@ export async function drawDeckCard(roomCode, uid) {
 
   if (!result.committed) throw new Error("INVALID_ACTION");
 }
-
 
 export async function discardCard(roomCode, uid, cardId) {
   const roomRef = ref(db, `rooms/${roomCode}`);
@@ -1504,7 +1694,9 @@ export async function advanceAfterRound(roomCode) {
     const playerIds = Object.keys(room.players ?? {});
     const teamMode = isTeamMode(room.meta?.mode);
 
-    const maxRounds = Number(room.meta?.maxRounds ?? 5);
+    const maxRounds = Number(
+      room.meta?.maxRounds ?? 5
+    );
 
     if (currentRound >= maxRounds) {
       room.meta.status = "FINISHED";
@@ -1520,9 +1712,17 @@ export async function advanceAfterRound(roomCode) {
           if (!team) continue;
 
           teamStats[team] = teamStats[team] ?? {
+            roundPoints: 0,
             teamRoundWins: 0,
             totalRemainingLife: 0
           };
+
+          teamStats[team].roundPoints = Math.max(
+            teamStats[team].roundPoints,
+            Number(
+              room.players[uid].roundPoints ?? 0
+            )
+          );
 
           teamStats[team].teamRoundWins = Math.max(
             teamStats[team].teamRoundWins,
@@ -1535,6 +1735,12 @@ export async function advanceAfterRound(roomCode) {
 
         room.game.finalTeamRanking = Object.keys(teamStats)
           .sort((teamA, teamB) => {
+            const points =
+              teamStats[teamB].roundPoints -
+              teamStats[teamA].roundPoints;
+
+            if (points !== 0) return points;
+
             const wins =
               teamStats[teamB].teamRoundWins -
               teamStats[teamA].teamRoundWins;
@@ -1620,7 +1826,6 @@ export async function advanceAfterRound(roomCode) {
   return result.committed;
 }
 
-
 export async function returnFinishedGameToLobby(
   roomCode,
   uid
@@ -1679,82 +1884,88 @@ export async function resetFinishedRoom(roomCode, uid) {
   }
 }
 
-export async function leaveRoom(roomCode, uid) {
-  const roomRef = ref(db, `rooms/${roomCode}`);
+export async function leaveRoom(
+  roomCode,
+  uid
+) {
+  const roomRef = ref(
+    db,
+    `rooms/${roomCode}`
+  );
 
-  await runTransaction(roomRef, (room) => {
-    if (!room) return null;
+  await runTransaction(
+    roomRef,
+    (room) => {
+      if (!room) return null;
 
-    const players = room.players ?? {};
+      const players =
+        room.players ?? {};
 
-    if (!players[uid]) return room;
+      if (!players[uid]) {
+        return room;
+      }
 
-    delete players[uid];
+      const leavingNickname =
+        players[uid]?.nickname ??
+        "플레이어";
 
-    const remainingIds = Object.keys(players);
+      delete players[uid];
 
-    if (remainingIds.length === 0) {
-      return null;
-    }
+      const remainingIds =
+        Object.keys(players);
 
-    room.players = players;
-    room.meta.updatedAt = Date.now();
+      if (remainingIds.length === 0) {
+        return null;
+      }
 
-    if (room.game) {
-      const game = room.game;
+      room.players = players;
+      room.meta.updatedAt = Date.now();
 
-      game.turnOrder = (game.turnOrder ?? [])
-        .filter((playerUid) => playerUid !== uid);
+      removePlayerFromActiveGame(
+        room,
+        uid,
+        leavingNickname
+      );
 
-      game.finalTurnQueue = (game.finalTurnQueue ?? [])
-        .filter((playerUid) => playerUid !== uid);
-
-      if (game.hands) delete game.hands[uid];
-      if (game.submissions) delete game.submissions[uid];
-
-      if (game.turnUid === uid) {
-        if (game.turnOrder.length > 0) {
-          const safeIndex = Math.min(
-            Number(game.turnIndex ?? 0),
-            game.turnOrder.length - 1
+      if (
+        room.game?.phase === "SUBMIT"
+      ) {
+        const submittedIds =
+          Object.keys(
+            room.game.submissions ?? {}
           );
 
-          game.turnIndex = Math.max(0, safeIndex);
-          game.turnUid = game.turnOrder[game.turnIndex];
-          game.turnStartedAt = Date.now();
-          game.turnNumber = Number(game.turnNumber ?? 0) + 1;
-        } else {
-          game.turnUid = null;
+        if (
+          remainingIds.every(
+            (playerUid) =>
+              submittedIds.includes(playerUid)
+          )
+        ) {
+          evaluateSet(room);
         }
-
-        game.lastAction = {
-          type: "PLAYER_LEFT_SKIP",
-          uid: null,
-          automatic: true,
-          at: Date.now()
-        };
       }
+
+      if (room.meta?.hostUid === uid) {
+        const nextHostUid = remainingIds
+          .sort((uidA, uidB) => {
+            return (
+              Number(
+                players[uidA]?.joinedAt ?? 0
+              ) -
+              Number(
+                players[uidB]?.joinedAt ?? 0
+              )
+            );
+          })[0];
+
+        room.meta.hostUid =
+          nextHostUid;
+        room.meta.hostChangedAt =
+          Date.now();
+      }
+
+      return room;
     }
-
-    if (room.meta?.hostUid === uid) {
-      const nextHostUid = remainingIds
-        .sort((uidA, uidB) => {
-          return Number(players[uidA]?.joinedAt ?? 0) -
-            Number(players[uidB]?.joinedAt ?? 0);
-        })[0];
-
-      room.meta.hostUid = nextHostUid;
-      room.meta.hostChangedAt = Date.now();
-
-      room.game = room.game ?? {};
-      room.game.lastAction = {
-        type: "HOST_CHANGED",
-        uid: nextHostUid,
-        automatic: true,
-        at: Date.now()
-      };
-    }
-
-    return room;
-  });
+  );
 }
+
