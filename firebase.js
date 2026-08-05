@@ -576,8 +576,7 @@ function evaluateSet(room) {
     !highestUids.includes(bellOwner);
 
   if (bellFailed) {
-    // 벨을 잘못 누른 경우에는 벨을 누른 사람만 라이프 2개 감소.
-    // 최저 점수 플레이어는 추가 라이프 감소가 없다.
+    // 잘못 벨을 누른 사람만 라이프 2개 감소.
     lifeLosses[bellOwner] = 2;
   } else {
     for (const uid of lowestUids) {
@@ -613,57 +612,27 @@ function evaluateSet(room) {
 }
 
 
-function awardRoundPoints(room, survivors) {
+function awardRoundPoints(room) {
   const players = room.players ?? {};
-  const teamMode = isTeamMode(room.meta?.mode);
+  const ids = Object.keys(players);
 
-  if (teamMode) {
-    const teamLife = {};
-
-    for (const [uid, player] of Object.entries(players)) {
-      const team = player.team;
-      if (!team) continue;
-      teamLife[team] = (teamLife[team] ?? 0) + Number(player.life ?? 0);
-    }
-
-    const rankedTeams = Object.keys(teamLife)
-      .sort((teamA, teamB) => teamLife[teamB] - teamLife[teamA]);
-
-    const teamPoints = {};
-    if (rankedTeams[0]) teamPoints[rankedTeams[0]] = 2;
-    if (rankedTeams[1]) teamPoints[rankedTeams[1]] = 1;
-
-    for (const player of Object.values(players)) {
-      player.roundPoints =
-        Number(player.roundPoints ?? 0) +
-        Number(teamPoints[player.team] ?? 0);
-    }
-
-    room.game.roundPointAwards = Object.fromEntries(
-      Object.entries(players).map(([uid, player]) => [
-        uid,
-        Number(teamPoints[player.team] ?? 0)
-      ])
-    );
-    return;
-  }
-
-  const ranking = Object.keys(players).sort((uidA, uidB) => {
+  const ranking = [...ids].sort((uidA, uidB) => {
     const lifeDiff =
-      Number(players[uidB].life ?? 0) -
-      Number(players[uidA].life ?? 0);
+      Number(players[uidB]?.life ?? 0) -
+      Number(players[uidA]?.life ?? 0);
 
     if (lifeDiff !== 0) return lifeDiff;
 
-    return Number(players[uidA].joinedAt ?? 0) -
-      Number(players[uidB].joinedAt ?? 0);
+    return Number(players[uidA]?.joinedAt ?? 0) -
+      Number(players[uidB]?.joinedAt ?? 0);
   });
 
   const awards = {};
+
   if (ranking[0]) awards[ranking[0]] = 2;
   if (ranking[1]) awards[ranking[1]] = 1;
 
-  for (const uid of Object.keys(players)) {
+  for (const uid of ids) {
     players[uid].roundPoints =
       Number(players[uid].roundPoints ?? 0) +
       Number(awards[uid] ?? 0);
@@ -723,7 +692,7 @@ function beginNextSet(room) {
       }
     }
 
-    awardRoundPoints(room, survivors);
+    awardRoundPoints(room);
 
     game.phase = "ROUND_END";
     game.turnUid = null;
@@ -997,9 +966,9 @@ export async function kickPlayer(
 
 
 export async function changeMaxRounds(roomCode, uid, maxRounds) {
-  const rounds = Number(maxRounds);
+  const value = Number(maxRounds);
 
-  if (![3, 5].includes(rounds)) {
+  if (![3, 5].includes(value)) {
     throw new Error("INVALID_ROUND_COUNT");
   }
 
@@ -1010,8 +979,9 @@ export async function changeMaxRounds(roomCode, uid, maxRounds) {
     if (room.meta?.hostUid !== uid) return;
     if (room.meta?.status !== "WAITING") return;
 
-    room.meta.maxRounds = rounds;
+    room.meta.maxRounds = value;
     room.meta.updatedAt = Date.now();
+
     return room;
   });
 
@@ -1110,9 +1080,10 @@ export async function takeOpenCard(roomCode, uid) {
     }
 
     const sourcePhase = game.phase;
+    const takenCard = game.openCard;
 
     const hand = Array.isArray(game.hands?.[uid]) ? [...game.hands[uid]] : [];
-    hand.push(game.openCard);
+    hand.push(takenCard);
 
     game.hands[uid] = hand;
     game.openCard = null;
@@ -1123,6 +1094,8 @@ export async function takeOpenCard(roomCode, uid) {
     game.lastAction = {
       type: "TAKE_OPEN",
       uid,
+      card: takenCard,
+      source: "OPEN",
       automatic: false,
       at: Date.now()
     };
@@ -1182,6 +1155,8 @@ export async function drawDeckCard(roomCode, uid) {
     game.lastAction = {
       type: "DRAW_DECK",
       uid,
+      card: drawnCard,
+      source: "DECK",
       automatic: false,
       at: Date.now()
     };
@@ -1741,18 +1716,18 @@ export async function leaveRoom(roomCode, uid) {
       if (game.submissions) delete game.submissions[uid];
 
       if (game.turnUid === uid) {
-        if (game.turnOrder.length === 0) {
-          game.turnUid = null;
-        } else {
-          const nextIndex = Math.min(
+        if (game.turnOrder.length > 0) {
+          const safeIndex = Math.min(
             Number(game.turnIndex ?? 0),
             game.turnOrder.length - 1
           );
 
-          game.turnIndex = Math.max(0, nextIndex);
+          game.turnIndex = Math.max(0, safeIndex);
           game.turnUid = game.turnOrder[game.turnIndex];
           game.turnStartedAt = Date.now();
           game.turnNumber = Number(game.turnNumber ?? 0) + 1;
+        } else {
+          game.turnUid = null;
         }
 
         game.lastAction = {
